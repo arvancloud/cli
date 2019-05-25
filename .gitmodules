@@ -1,0 +1,12 @@
+[submodule "vendor/origin"]
+	path = vendor/github.com/openshift/origin
+	url = git@git.arvan.me:paas/origin.git
+	branch = arvan-release-3.11-no-vendor-conflict
+[submodule "vendor/github.com/spf13/cobra"]
+	path = vendor/github.com/spf13/cobra
+	url = https://github.com/spf13/cobra
+	branch = master
+[submodule "vendor/github.com/spf13/pflag"]
+	path = vendor/github.com/spf13/pflag
+	url = https://github.com/spf13/pflag
+	branch = master
