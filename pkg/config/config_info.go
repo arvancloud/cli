@@ -7,7 +7,7 @@ import (
 
 	"gopkg.in/yaml.v2"
 
-	"git.arvan.me/arvan/cli/internal/pkg/api"
+	"git.arvan.me/arvan/cli/pkg/api"
 )
 
 const (

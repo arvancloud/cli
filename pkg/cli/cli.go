@@ -8,8 +8,8 @@ import (
 
 	"github.com/openshift/origin/pkg/cmd/util/term"
 
-	"git.arvan.me/arvan/cli/internal/pkg/config"
-	"git.arvan.me/arvan/cli/internal/pkg/paas"
+	"git.arvan.me/arvan/cli/pkg/config"
+	"git.arvan.me/arvan/cli/pkg/paas"
 )
 
 var (

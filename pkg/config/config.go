@@ -13,8 +13,8 @@ import (
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v2"
 
-	"git.arvan.me/arvan/cli/internal/pkg/api"
-	"git.arvan.me/arvan/cli/internal/pkg/util"
+	"git.arvan.me/arvan/cli/pkg/api"
+	"git.arvan.me/arvan/cli/pkg/util"
 )
 
 type configFile struct {

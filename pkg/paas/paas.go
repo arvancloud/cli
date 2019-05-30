@@ -9,7 +9,7 @@ import (
 	oc "github.com/openshift/origin/pkg/oc/cli"
 	"github.com/spf13/cobra"
 
-	"git.arvan.me/arvan/cli/internal/pkg/config"
+	"git.arvan.me/arvan/cli/pkg/config"
 )
 
 const kubeConfigFileName = "/paasconfig"
