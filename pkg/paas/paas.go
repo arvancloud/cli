@@ -32,7 +32,7 @@ func preparePaasAuthentication(cmd *cobra.Command) error {
 	kubeConfigPath := paasConfigPath()
 	arvanConfig := config.GetConfigInfo()
 
-	if len(arvanConfig.ApiKey) == 0 {
+	if len(arvanConfig.GetApiKey()) == 0 {
 		return errors.New("no authorization credentials provided")
 	} else {
 		loginRequired := false
@@ -58,7 +58,7 @@ func preparePaasAuthentication(cmd *cobra.Command) error {
 
 func paasConfigPath() string {
 	arvanConfig := config.GetConfigInfo()
-	return arvanConfig.HomeDir + "/" + kubeConfigFileName
+	return arvanConfig.GetHomeDir() + "/" + kubeConfigFileName
 }
 
 func setConfigFlag(cmd *cobra.Command, kubeConfigPath string) {
@@ -84,5 +84,5 @@ func initiateLogin(cmd *cobra.Command) {
 	arvanConfig := config.GetConfigInfo()
 	setConfigFlag(cmd, kubeConfigPath)
 	//#TODO disable insecure tls
-	oc.InitiateLogin(arvanConfig.Server, "apikey", arvanConfig.ApiKey, true, cmd, in, out, errout)
+	oc.InitiateLogin(arvanConfig.GetServer(), "apikey", arvanConfig.GetApiKey(), true, cmd, in, out, errout)
 }

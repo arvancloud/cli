@@ -39,8 +39,8 @@ func GetConfigInfo() *ConfigInfo {
 	once.Do(func() {
 		defaultHome, _ := defaultHomeDir()
 		instance = &ConfigInfo{
-			HomeDir:        defaultHome,
-			ConfigFilePath: defaultConfigFilePath(defaultHome),
+			homeDir:        defaultHome,
+			configFilePath: defaultConfigFilePath(defaultHome),
 		}
 	})
 	return instance
@@ -64,8 +64,8 @@ func NewCmdLogin(in io.Reader, out, errout io.Writer) *cobra.Command {
 			arvanConfig := GetConfigInfo()
 
 			reader := bufio.NewReader(in)
-			if len(arvanConfig.ApiKey) > 0 {
-				fmt.Fprintf(explainOut, "Enter arvan API token (%s): ", arvanConfig.ApiKey)
+			if len(arvanConfig.apiKey) > 0 {
+				fmt.Fprintf(explainOut, "Enter arvan API token (%s): ", arvanConfig.apiKey)
 			} else {
 				fmt.Fprintf(explainOut, "Enter arvan API token: ")
 			}
@@ -74,9 +74,9 @@ func NewCmdLogin(in io.Reader, out, errout io.Writer) *cobra.Command {
 
 			apiKey = strings.TrimSpace(apiKey)
 			if len(apiKey) > 0 {
-				arvanConfig.ApiKey = apiKey
+				arvanConfig.apiKey = apiKey
 			}
-			arvanConfig.Region = region
+			arvanConfig.region = region
 
 			util.CheckErr(arvanConfig.Complete())
 
@@ -98,7 +98,7 @@ func LoadConfigFile() (bool, error) {
 	arvanConfig := GetConfigInfo()
 
 	if arvanConfig.ConfigFileProvided() {
-		data, err := ioutil.ReadFile(arvanConfig.ConfigFilePath)
+		data, err := ioutil.ReadFile(arvanConfig.configFilePath)
 		if err != nil {
 			return false, err
 		}
@@ -107,9 +107,9 @@ func LoadConfigFile() (bool, error) {
 		if err != nil {
 			return false, err
 		}
-		arvanConfig.ApiKey = configFileStruct.ApiKey
-		arvanConfig.Region = configFileStruct.Region
-		arvanConfig.Server = configFileStruct.Server
+		arvanConfig.apiKey = configFileStruct.ApiKey
+		arvanConfig.region = configFileStruct.Region
+		arvanConfig.server = configFileStruct.Server
 		return true, nil
 	}
 

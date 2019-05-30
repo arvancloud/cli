@@ -17,19 +17,44 @@ const (
 // ConfigInfo is a struct to access authorization information and global configurations of arvan cli save based on `arvan login` command.
 type ConfigInfo struct {
 	// base url to access arvan api server
-	Server string
+	server string
 
 	// Arvan region
-	Region string
+	region string
 
 	// an api key used to authorize request to arvan api server
-	ApiKey string
+	apiKey string
 
 	// path to arvan config file e.g /home/jane/.arvan/config
-	ConfigFilePath string
+	configFilePath string
 
 	// path to arvan config directroy e.g /home/jane/.arvan
-	HomeDir string
+	homeDir string
+}
+
+//GetServer returns base url to access arvan api server
+func (c *ConfigInfo) GetServer() string {
+	return c.server
+}
+
+//GetRegion returns Arvan region
+func (c *ConfigInfo) GetRegion() string {
+	return c.region
+}
+
+//GetApiKey returns an api key used to authorize request to arvan api server
+func (c *ConfigInfo) GetApiKey() string {
+	return c.apiKey
+}
+
+//GetConfigFilePath returns path to arvan config file e.g /home/jane/.arvan/config
+func (c *ConfigInfo) GetConfigFilePath() string {
+	return c.configFilePath
+}
+
+//GetHomeDir returns path to arvan config directroy e.g /home/jane/.arvan
+func (c *ConfigInfo) GetHomeDir() string {
+	return c.homeDir
 }
 
 func (c *ConfigInfo) Complete() error {
@@ -38,21 +63,21 @@ func (c *ConfigInfo) Complete() error {
 	}
 
 	if !c.ServerProvided() {
-		c.Server = serverAddress(c.Region)
+		c.server = serverAddress(c.region)
 	}
 
 	if !c.HomeDirProvided() {
-		c.HomeDir, _ = defaultHomeDir()
+		c.homeDir, _ = defaultHomeDir()
 	}
 
 	if !c.ConfigFileProvided() {
-		c.ConfigFilePath = defaultConfigFilePath(c.HomeDir)
+		c.configFilePath = defaultConfigFilePath(c.homeDir)
 	}
 	return nil
 }
 
 func (c *ConfigInfo) IsAuthorized() (bool, error) {
-	if _, err := api.GetUserInfo(c.ApiKey); err != nil {
+	if _, err := api.GetUserInfo(c.apiKey); err != nil {
 		return false, err
 	}
 	return true, nil
@@ -67,13 +92,13 @@ func (c *ConfigInfo) SaveConfig() (bool, error) {
 	if !c.HomeDirProvided() {
 		return false, errors.New("no home directory provided")
 	}
-	if _, err := os.Stat(c.HomeDir); os.IsNotExist(err) {
-		err = os.MkdirAll(c.HomeDir, os.ModePerm)
+	if _, err := os.Stat(c.homeDir); os.IsNotExist(err) {
+		err = os.MkdirAll(c.homeDir, os.ModePerm)
 		if err != nil {
 			return false, err
 		}
 	}
-	file, err := os.Create(c.ConfigFilePath)
+	file, err := os.Create(c.configFilePath)
 	if err != nil {
 		return false, err
 	}
@@ -82,9 +107,9 @@ func (c *ConfigInfo) SaveConfig() (bool, error) {
 
 	configFileStruct := configFile{
 		ApiVersion: configFileApiVersion,
-		Server:     c.Server,
-		Region:     c.Region,
-		ApiKey:     c.ApiKey,
+		Server:     c.server,
+		Region:     c.region,
+		ApiKey:     c.apiKey,
 	}
 
 	configFileStr, err := yaml.Marshal(&configFileStruct)
@@ -99,16 +124,16 @@ func (c *ConfigInfo) SaveConfig() (bool, error) {
 	return true, nil
 }
 func (c *ConfigInfo) RegionProvided() bool {
-	return len(c.Region) > 0
+	return len(c.region) > 0
 }
 func (c *ConfigInfo) ServerProvided() bool {
-	return len(c.Server) > 0
+	return len(c.server) > 0
 }
 func (c *ConfigInfo) HomeDirProvided() bool {
-	return len(c.HomeDir) > 0
+	return len(c.homeDir) > 0
 }
 func (c *ConfigInfo) ConfigFileProvided() bool {
-	return len(c.ConfigFilePath) > 0
+	return len(c.configFilePath) > 0
 }
 
 func defaultHomeDir() (string, error) {
