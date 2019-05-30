@@ -1,5 +1,6 @@
 package cli
 
+// #TODO set bash compalition
 const (
 	bashCompletionFunc = `# call oc get $1,
 __oc_override_flag_list=(config cluster user context namespace server)

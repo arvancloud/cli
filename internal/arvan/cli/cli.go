@@ -8,6 +8,7 @@ import (
 
 	"github.com/openshift/origin/pkg/cmd/util/term"
 
+	"git.arvan.me/arvan/cli/internal/pkg/config"
 	"git.arvan.me/arvan/cli/internal/pkg/paas"
 )
 
@@ -30,7 +31,10 @@ var (
 
 // NewCommandCLI return new cobra cli
 func NewCommandCLI() *cobra.Command {
-	out := os.Stdout
+	// Load ConfigInfo from default path if exists
+	config.LoadConfigFile()
+
+	in, out, errout := os.Stdin, os.Stdout, os.Stderr
 	// Main command
 	cmd := &cobra.Command{
 		Use:   cliName,
@@ -44,8 +48,11 @@ func NewCommandCLI() *cobra.Command {
 		BashCompletionFunction: bashCompletionFunc,
 	}
 
-	paasCommand := paas.NewCmdPaas()
-
+	paasCommand := paas.NewCmdPaas(in, out, errout)
 	cmd.AddCommand(paasCommand)
+
+	loginCommand := config.NewCmdLogin(in, out, errout)
+	cmd.AddCommand(loginCommand)
+
 	return cmd
 }
