@@ -83,5 +83,6 @@ func initiateLogin(cmd *cobra.Command) {
 	kubeConfigPath := paasConfigPath()
 	arvanConfig := config.GetConfigInfo()
 	setConfigFlag(cmd, kubeConfigPath)
+	//#TODO disable insecure tls
 	oc.InitiateLogin(arvanConfig.Server, "apikey", arvanConfig.ApiKey, true, cmd, in, out, errout)
 }
