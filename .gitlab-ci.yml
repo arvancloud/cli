@@ -1,0 +1,13 @@
+image: reg.arvan.me/golang:1.10-alpine
+
+variables:
+  GIT_SUBMODULE_STRATEGY: recursive
+
+before_script:
+  - mkdir -p /go/src/git.arvan.me/arvan/
+  - cp -r $CI_PROJECT_DIR /go/src/git.arvan.me/arvan/cli
+  - mkdir -p /tmp/arvan-cli
+
+build:
+  script:
+  - sh scripts/build/build.sh /tmp/arvan-cli/arvan

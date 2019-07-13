@@ -8,5 +8,9 @@
 	branch = master
 [submodule "vendor/github.com/openshift/origin"]
 	path = vendor/github.com/openshift/origin
-	url = git@git.arvan.me:paas/origin.git
+	url = ../../paas/origin.git
 	branch = arvan-release-3.11-no-vendor-conflict
+[submodule "vendor/gopkg.in/yaml.v2"]
+	path = vendor/gopkg.in/yaml.v2
+	url = https://github.com/go-yaml/yaml
+	branch = v2
