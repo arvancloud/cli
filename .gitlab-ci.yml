@@ -7,6 +7,7 @@ before_script:
   - mkdir -p /go/src/git.arvan.me/arvan/
   - cp -r $CI_PROJECT_DIR /go/src/git.arvan.me/arvan/cli
   - mkdir -p /tmp/arvan-cli
+  - apk add --update alpine-sdk krb5-dev
 
 build:
   script:
