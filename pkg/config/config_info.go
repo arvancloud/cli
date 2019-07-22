@@ -150,8 +150,5 @@ func defaultConfigFilePath(homeDir string) string {
 
 // #TODO implement default server address
 func serverAddress(region string) string {
-	if len(region) > 0 {
-		return "https://console.paas.arvaniaas.com:8443"
-	}
-	return "https://console.paas.arvaniaas.com:8443"
+	return "https://napi.arvancloud.com"
 }

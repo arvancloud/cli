@@ -21,7 +21,7 @@ type configFile struct {
 	ApiVersion string `yaml:"apiVersion"`
 	Server     string `yaml:"server"`
 	Region     string `yaml:"region"`
-	ApiKey     string `yaml:"apiKey"`
+	ApiKey     string `yaml:"apikey"`
 }
 
 var instance *ConfigInfo
