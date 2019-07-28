@@ -6,8 +6,6 @@ import (
 	"os/user"
 
 	"gopkg.in/yaml.v2"
-
-	"git.arvan.me/arvan/cli/pkg/api"
 )
 
 const (
@@ -57,6 +55,11 @@ func (c *ConfigInfo) GetHomeDir() string {
 	return c.homeDir
 }
 
+func (c *ConfigInfo) Initiate(apiKey, region string) {
+	c.apiKey = apiKey
+	c.region = region
+}
+
 func (c *ConfigInfo) Complete() error {
 	if !c.RegionProvided() {
 		return errors.New("No region has been set.")
@@ -74,13 +77,6 @@ func (c *ConfigInfo) Complete() error {
 		c.configFilePath = defaultConfigFilePath(c.homeDir)
 	}
 	return nil
-}
-
-func (c *ConfigInfo) IsAuthorized() (bool, error) {
-	if _, err := api.GetUserInfo(c.apiKey); err != nil {
-		return false, err
-	}
-	return true, nil
 }
 
 // SaveConfig save config info to ConfigFilePath
