@@ -1,17 +1,17 @@
 package login
 
 import (
-	"bufio"
 	"io"
 	"fmt"
-	"strings"
 	"errors"
+	"strconv"
+	"regexp"
 
 	"github.com/openshift/origin/pkg/cmd/util/term"
 	"github.com/spf13/cobra"
 
 	"git.arvan.me/arvan/cli/pkg/api"
-	"git.arvan.me/arvan/cli/pkg/util"
+	"git.arvan.me/arvan/cli/pkg/utl"
 	"git.arvan.me/arvan/cli/pkg/config"
 )
 
@@ -35,35 +35,24 @@ func NewCmdLogin(in io.Reader, out, errout io.Writer) *cobra.Command {
 			c.SetOutput(explainOut)
 
 			region, err := getSelectedRegion(in, explainOut)
-			util.CheckErr(err)
+			utl.CheckErr(err)
+
+			apiKey := getApiKey(in, explainOut)
 
 			config.LoadConfigFile()
 			arvanConfig := config.GetConfigInfo()
 
-			reader := bufio.NewReader(in)
-			if len(arvanConfig.GetApiKey()) > 0 {
-				fmt.Fprintf(explainOut, "Enter arvan API token (%s): ", arvanConfig.GetApiKey())
-			} else {
-				fmt.Fprintf(explainOut, "Enter arvan API token: ")
-			}
-			apiKey, err := reader.ReadString('\n')
-			util.CheckErr(err)
-
-			apiKey = strings.TrimSpace(apiKey)
-			if len(apiKey) == 0 {
-				apiKey = arvanConfig.GetApiKey()
-			}
 			arvanConfig.Initiate(apiKey, region)
 
-			util.CheckErr(arvanConfig.Complete())
+			utl.CheckErr(arvanConfig.Complete())
 
 			// _, err = arvanConfig.IsAuthorized()
-			// util.CheckErr(err)
+			// utl.CheckErr(err)
 
 			fmt.Fprintf(explainOut, "Logged in successfully!\n")
 
 			_, err = arvanConfig.SaveConfig()
-			util.CheckErr(err)
+			utl.CheckErr(err)
 		},
 	}
 
@@ -77,6 +66,27 @@ func NewCmdLogin(in io.Reader, out, errout io.Writer) *cobra.Command {
 // 	return true, nil
 // }
 
+func getApiKey(in io.Reader, writer io.Writer) string {
+	arvanConfig := config.GetConfigInfo()
+
+	inputExplain := "Enter arvan API token: "
+	defaultVal := arvanConfig.GetApiKey()
+
+	if len(defaultVal) > 0 {
+		inputExplain = fmt.Sprintf("%s[%s]: ",inputExplain , defaultVal)
+	}
+
+	return utl.ReadInput(inputExplain, defaultVal, writer, in, apiKeyValidator)
+}
+
+func apiKeyValidator(input string) (bool, error) {
+	var validApiKey = regexp.MustCompile(`^Apikey [a-z0-9\-]+$$`)
+	if (!validApiKey.MatchString(input)){
+		return false, errors.New("API token should be in format: 'Apikey xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'")
+	}
+	return true, nil
+}
+
 
 // getSelectedRegion #TODO implement getSelectedRegion
 func getSelectedRegion(in io.Reader, writer io.Writer) (string, error) {
@@ -85,33 +95,68 @@ func getSelectedRegion(in io.Reader, writer io.Writer) (string, error) {
 		return "", err
 	}
 	if len(regions) < 1 {
-		return "", errors.New("Invalid region info.")
-	}
-	fmt.Fprintf(writer, "Select arvan region:\n")
-	printRegions(regions, writer)
-	if len(regions) == 1 {
-		fmt.Fprintf(writer, "Region Number[1]: 1\n")
-		return regions[0], nil
+		return "", errors.New("invalid region info")
 	}
 
-	region := ""
-	for {
-		fmt.Fprintf(writer, "Region Number:")
-		var i int
-    	_, err := fmt.Fscan(in, &i)
-		if err != nil || i<1 || i > len(regions) {
-			fmt.Fprintf(writer, "Error: Enter a number between '1' and '%d'\n", len(regions))
-		} else {
-			region = regions[i-1]
-			break
-		}
+	activeRegions, inactiveRegions := getActiveAndInactiveRegins(regions)
+
+	if len(activeRegions) < 1 {
+		return "", errors.New("no active region available")
 	}
 
-	return region, nil
+	explain := "Select arvan region:\n"
+	explain += sprintRegions(activeRegions, inactiveRegions)
+
+	fmt.Fprintf(writer, explain)
+
+	inputExplain := "Region Number[1]: "
+
+	defaultVal := "1"
+
+	if len(activeRegions) == 1 {
+		fmt.Fprintf(writer, inputExplain + "1\n")
+		return activeRegions[0].Name, nil
+	}
+
+	validator := regionValidator{len(activeRegions)}
+
+	regionIndex := utl.ReadInput(inputExplain, defaultVal, writer, in, validator.validate)
+	intIndex, _ := strconv.Atoi(regionIndex)
+
+	return activeRegions[intIndex-1].Name, nil
 }
 
-func printRegions(regions []string, writer io.Writer) {
-	for i := 0; i < len(regions); i++ {
-		fmt.Fprintf(writer, "  [%d] %s\n", i+1 , regions[i])
+type regionValidator struct {
+	upperBound int
+}
+
+func (r regionValidator) validate(input string) (bool, error) {
+	intInput, err := strconv.Atoi(input)
+	if err != nil || intInput < 1 || intInput > r.upperBound {
+		return false, fmt.Errorf("enter a number between '1' and '%d'\n", r.upperBound)
+	} 
+	return true, nil
+}
+
+func sprintRegions(activeRegions, inactiveRegions []api.Region) string {
+	result := ""
+	for i := 0; i < len(activeRegions); i++ {
+		result += fmt.Sprintf("  [%d] %s\n", i+1 , activeRegions[i].Name)
 	}
+	for i := 0; i < len(inactiveRegions); i++ {
+		result += fmt.Sprintf("  [-] %s (inactive)\n", inactiveRegions[i].Name)
+	}
+	return result
+}
+
+func getActiveAndInactiveRegins(regions []api.Region) ([]api.Region, []api.Region){
+	var activeRegions, inactiveRegions []api.Region
+	for i := 0; i < len(regions); i++ {
+		if regions[i].Active {
+			activeRegions = append(activeRegions, regions[i])
+		} else {
+			inactiveRegions = append(inactiveRegions, regions[i])
+		}
+	}
+	return activeRegions, inactiveRegions
 }

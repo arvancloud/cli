@@ -61,12 +61,9 @@ func (c *ConfigInfo) Initiate(apiKey, region string) {
 }
 
 func (c *ConfigInfo) Complete() error {
-	if !c.RegionProvided() {
-		return errors.New("No region has been set.")
-	}
 
 	if !c.ServerProvided() {
-		c.server = serverAddress(c.region)
+		c.server = serverAddress()
 	}
 
 	if !c.HomeDirProvided() {
@@ -145,6 +142,6 @@ func defaultConfigFilePath(homeDir string) string {
 }
 
 // #TODO implement default server address
-func serverAddress(region string) string {
+func serverAddress() string {
 	return "https://napi.arvancloud.com"
 }

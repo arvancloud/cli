@@ -22,9 +22,15 @@ func GetUserInfo(apikey string) (map[string]string, error) {
 	return nil, errors.New("No api key provided.")
 }
 
-//GetRegions
-func GetRegions() ([]string, error) {
-	var regions []string
+// Region of PaaS service
+type Region struct {
+	Name   string
+	Active bool
+}
+
+//GetRegions from PaaS API
+func GetRegions() ([]Region, error) {
+	var regions []Region
 	arvanConfig := config.GetConfigInfo()
 	arvanServer := arvanConfig.GetServer()
 	httpReq, err := http.NewRequest("GET", arvanServer+apiPrefix+defaultRegion+regionsEndpoint, nil)

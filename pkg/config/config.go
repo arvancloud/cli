@@ -21,11 +21,8 @@ var once sync.Once
 // GetConfigInfo return ConfigInfo instance including the information about server url and authorization info
 func GetConfigInfo() *ConfigInfo {
 	once.Do(func() {
-		defaultHome, _ := defaultHomeDir()
-		instance = &ConfigInfo{
-			homeDir:        defaultHome,
-			configFilePath: defaultConfigFilePath(defaultHome),
-		}
+		instance = &ConfigInfo{}
+		instance.Complete()
 	})
 	return instance
 }

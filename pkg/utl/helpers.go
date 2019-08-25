@@ -1,8 +1,10 @@
-package util
+package utl
 
 import (
 	"fmt"
 	"os"
+	"io"
+	"bufio"
 	"strings"
 )
 
@@ -37,4 +39,30 @@ func checkErr(err error, handleErr func(string, int)) {
 	}
 	fmt.Println(err)
 	handleErr("", DefaultErrorExitCode)
+}
+
+
+
+// ReadInput prints explain and repeat printing inputExplain to out and reads a string from in.
+//   If input is empty and defaultVal is set returns default value
+//   If defaultVal is not set, tries to validate input using validate
+func ReadInput(inputExplain, defaultVal string, out io.Writer, in io.Reader, validate func(string) (bool, error)) string {
+	reader := bufio.NewReader(in)
+	for {
+		fmt.Fprintf(out, inputExplain)
+		i, err := reader.ReadString('\n')
+		if err != nil {
+			fmt.Fprintf(out, "Error: %s\n", err.Error())
+		} else {
+			i = strings.TrimSpace(i)
+			if len(i) == 0 && len(defaultVal) > 0 {
+				return defaultVal
+			}
+			valid, err := validate(i)
+			if valid {
+				return i
+			}
+			fmt.Fprintf(out, "Error: %s\n", err.Error())
+		}
+	}	
 }

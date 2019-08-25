@@ -33,6 +33,7 @@ type whoAmIMetadata struct {
 // NewCmdPaas return new cobra cli for paas
 func NewCmdPaas(in io.Reader, out, errout io.Writer) *cobra.Command {
 
+	// #TODO do not hardcode InsecureSkipVerify
 	paasCommand := oc.InitiatedCommand("paas", "arvan paas")
 
 	paasCommand.PersistentPreRun = func(cmd *cobra.Command, args []string) {
@@ -54,6 +55,7 @@ func preparePaasAuthentication(cmd *cobra.Command) error {
 		return errors.New("no authorization credentials provided")
 	}
 
+	// #TODO do not use InsecureSkipVerify
 	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	username, err := whoAmI()
 	if err != nil {
