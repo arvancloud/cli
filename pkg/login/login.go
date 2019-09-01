@@ -46,25 +46,28 @@ func NewCmdLogin(in io.Reader, out, errout io.Writer) *cobra.Command {
 
 			utl.CheckErr(arvanConfig.Complete())
 
-			// _, err = arvanConfig.IsAuthorized()
-			// utl.CheckErr(err)
-
-			fmt.Fprintf(explainOut, "Logged in successfully!\n")
-
 			_, err = arvanConfig.SaveConfig()
 			utl.CheckErr(err)
+
+			fmt.Fprintf(explainOut, "Configuration saved successfully.\n")
+
+
+			_, err = isAuthorized(apiKey)
+			utl.CheckErr(err)
+
+			fmt.Fprintf(explainOut, "Valid Authorization credentials. Logged in successfully!\n")
 		},
 	}
 
 	return cmd
 }
 
-// func (c *ConfigInfo) IsAuthorized() (bool, error) {
-// 	if _, err := api.GetUserInfo(c.apiKey); err != nil {
-// 		return false, err
-// 	}
-// 	return true, nil
-// }
+func isAuthorized(apiKey string) (bool, error) {
+	if _, err := api.GetUserInfo(apiKey); err != nil {
+		return false, err
+	}
+	return true, nil
+}
 
 func getApiKey(in io.Reader, writer io.Writer) string {
 	arvanConfig := config.GetConfigInfo()
