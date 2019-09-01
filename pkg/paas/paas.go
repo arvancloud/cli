@@ -15,6 +15,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"git.arvan.me/arvan/cli/pkg/config"
+	"git.arvan.me/arvan/cli/pkg/utl"
 )
 
 const (
@@ -38,10 +39,7 @@ func NewCmdPaas(in io.Reader, out, errout io.Writer) *cobra.Command {
 
 	paasCommand.PersistentPreRun = func(cmd *cobra.Command, args []string) {
 		err := preparePaasAuthentication(cmd)
-		if err != nil {
-			fmt.Println(err)
-			panic(`Login required. Try "arvan login"`)
-		}
+		utl.CheckErr(err)
 	}
 
 	return paasCommand
@@ -52,17 +50,21 @@ func preparePaasAuthentication(cmd *cobra.Command) error {
 	arvanConfig := config.GetConfigInfo()
 
 	if len(arvanConfig.GetApiKey()) == 0 {
-		return errors.New("no authorization credentials provided")
+		return errors.New("no authorization credentials provided. \nTry \"arvan login\"")
 	}
 
 	// #TODO do not use InsecureSkipVerify
 	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	username, err := whoAmI()
 	if err != nil {
-		return err
+		return fmt.Errorf("%v\n%s", err, `Try "arvan login".`)
 	}
 
 	projects, err := projectList()
+
+	if len(projects) == 0 && cmd.Name() != "new-project" {
+		return errors.New("no project found. \n To get started create new project using \"arvan paas new-project NAME\".")
+	}
 
 	kubeConfigPath := paasConfigPath()
 	setConfigFlag(cmd, kubeConfigPath)
@@ -128,7 +130,7 @@ func whoAmI() (string, error) {
 		}
 	}
 
-	return "", errors.New("No user.")
+	return "", errors.New("invalid authentication credentials.")
 }
 
 func projectList() ([]string, error) {
