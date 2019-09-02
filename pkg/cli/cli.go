@@ -49,11 +49,27 @@ func NewCommandCLI() *cobra.Command {
 		BashCompletionFunction: bashCompletionFunc,
 	}
 
-	paasCommand := paas.NewCmdPaas(in, out, errout)
-	cmd.AddCommand(paasCommand)
+
+	optionsCommand := newCmdOptions()
+	cmd.AddCommand(optionsCommand)
 
 	loginCommand := login.NewCmdLogin(in, out, errout)
 	cmd.AddCommand(loginCommand)
+
+	paasCommand := paas.NewCmdPaas(in, out, errout)
+	cmd.AddCommand(paasCommand)
+
+	return cmd
+}
+
+// newCmdOptions implements the OpenShift cli options command
+func newCmdOptions() *cobra.Command {
+	cmd := &cobra.Command{
+		Use: "options",
+		Run: func(cmd *cobra.Command, args []string) {
+			cmd.Usage()
+		},
+	}
 
 	return cmd
 }
