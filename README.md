@@ -37,6 +37,24 @@ Example:
 BUILD_TAGS="include_gcs include_oss" ./scripts/build/build.sh ~/go/bin/arvan
 ```
 
+`LDFLAGS`: add build tags to `go build`.
+
+Example: disable debug information with `-s -w`:
+
+```bash
+GOEXEC=/usr/lib/go-1.10/bin/go LDFLAGS="-s -w" ./scripts/build/build.sh ~/go/bin/arvan
+```
+
+#### Shrink go binary size
+
+Make sure you disabled debug informations using `-s -w` flags.
+
+Use UPX to compress your binary:
+
+```bash
+upx -7 /home/vahid/go/bin/arvan
+```
+
 ### Subcommand Development:
 
 You can add any subcommand to arvan by developing a [cobra](https://github.com/spf13/cobra) command and add to to arvan as subcommand.

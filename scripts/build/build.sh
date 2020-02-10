@@ -11,7 +11,7 @@ OUTPUT=$1
 
 BUILD_TAGS="$BUILD_TAGS include_gcs include_oss containers_image_openpgp gssapi"
 
-LDFLAGS="-X github.com/openshift/origin/pkg/oc/clusterup.defaultImageStreams=centos7"
+LDFLAGS="$LDFLAGS -X github.com/openshift/origin/pkg/oc/clusterup.defaultImageStreams=centos7"
 LDFLAGS="$LDFLAGS -X github.com/openshift/origin/pkg/cmd/util/variable.DefaultImagePrefix=openshift/origin"
 LDFLAGS="$LDFLAGS -X github.com/openshift/origin/pkg/version.majorFromGit=3"
 LDFLAGS="$LDFLAGS -X github.com/openshift/origin/pkg/version.minorFromGit=11+"

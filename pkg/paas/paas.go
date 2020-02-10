@@ -55,9 +55,15 @@ func preparePaasAuthentication(cmd *cobra.Command) error {
 
 	// #TODO do not use InsecureSkipVerify
 	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
-	username, err := whoAmI()
+	username, httpStatusCode, err := whoAmI()
 	if err != nil {
-		return fmt.Errorf("%v\n%s", err, `Try "arvan login".`)
+		if httpStatusCode == 401 {
+			return fmt.Errorf("%v\n%s", err, `Try "arvan login".`)
+		}
+		if httpStatusCode >= 500 {
+			return fmt.Errorf("%v\n%s", err, `Please try again later`)
+		}
+		return err
 	}
 
 	projects, err := projectList()
@@ -91,46 +97,53 @@ func setConfigFlag(cmd *cobra.Command, kubeConfigPath string) {
 }
 
 // #TODO Implement whoAmI
-func whoAmI() (string, error) {
+func whoAmI() (string, int, error) {
 	httpReq, err := http.NewRequest("GET", getArvanPaasServerBase()+whoAmIPath, nil)
 	httpReq.Header.Add("accept", "application/json")
 	httpReq.Header.Add("authorization", getArvanAuthorization())
 	httpResp, err := http.DefaultClient.Do(httpReq)
 	if err != nil {
-		return "", err
+		return "", 0, err
+	}
+
+	if httpResp.StatusCode != 200 {
+		return "", httpResp.StatusCode, fmt.Errorf(httpResp.Status)
 	}
 
 	// read body
 	defer httpResp.Body.Close()
 	body, err := ioutil.ReadAll(httpResp.Body)
+	if err != nil {
+		return "", httpResp.StatusCode, err
+	}
 
 	// parse response
 	var objmap map[string]*json.RawMessage
 	err = json.Unmarshal(body, &objmap)
 	if err != nil {
-		return "", err
+		return "", httpResp.StatusCode, err
 	}
 
 	if objmap["kind"] != nil {
 		var kind string
 		err = json.Unmarshal(*objmap["kind"], &kind)
 		if err != nil || kind != "User" {
-			return "", err
+			return "", httpResp.StatusCode, err
 		}
 		if kind != "User" {
-			return "", errors.New("User kind not supported")
+			return "", httpResp.StatusCode, errors.New("User kind not supported")
 		}
 		var v map[string]*string
 		err = json.Unmarshal(*objmap["metadata"], &v)
 		if err != nil {
-			return "", err
+			return "", httpResp.StatusCode, err
 		}
 		if v["name"] != nil && len(*v["name"]) > 0 {
-			return *v["name"], nil
+			return *v["name"], httpResp.StatusCode, nil
 		}
 	}
 
-	return "", errors.New("invalid authentication credentials.")
+	return "", httpResp.StatusCode, errors.New("invalid authentication credentials.")
 }
 
 func projectList() ([]string, error) {
