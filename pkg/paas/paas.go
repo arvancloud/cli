@@ -1,15 +1,15 @@
 package paas
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
-	"crypto/tls"
 	"net/url"
 	"strings"
-	"fmt"
 
 	oc "github.com/openshift/origin/pkg/oc/cli"
 	"github.com/spf13/cobra"
@@ -133,13 +133,18 @@ func whoAmI() (string, int, error) {
 		if kind != "User" {
 			return "", httpResp.StatusCode, errors.New("User kind not supported")
 		}
-		var v map[string]*string
-		err = json.Unmarshal(*objmap["metadata"], &v)
+		var metadata map[string]*json.RawMessage
+		err = json.Unmarshal(*objmap["metadata"], &metadata)
 		if err != nil {
 			return "", httpResp.StatusCode, err
 		}
-		if v["name"] != nil && len(*v["name"]) > 0 {
-			return *v["name"], httpResp.StatusCode, nil
+		if metadata["name"] != nil {
+			var userName string
+			err = json.Unmarshal(*metadata["name"], &userName)
+			if err != nil {
+				return "", httpResp.StatusCode, err
+			}
+			return userName, httpResp.StatusCode, nil
 		}
 	}
 
@@ -166,7 +171,7 @@ func projectList() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	if (objmap["items"] != nil) {
+	if objmap["items"] != nil {
 		var projects []*json.RawMessage
 		err = json.Unmarshal(*objmap["items"], &projects)
 		if err != nil {
@@ -192,7 +197,7 @@ func projectList() ([]string, error) {
 				}
 				result = append(result, projectName)
 			}
-			return result,nil
+			return result, nil
 		} else {
 			return nil, nil
 		}
