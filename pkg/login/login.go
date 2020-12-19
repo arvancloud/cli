@@ -1,18 +1,19 @@
 package login
 
 import (
-	"io"
-	"fmt"
 	"errors"
-	"strconv"
+	"fmt"
+	"io"
+	"log"
 	"regexp"
+	"strconv"
 
-	"github.com/openshift/origin/pkg/cmd/util/term"
+	"github.com/openshift/oc/pkg/helpers/term"
 	"github.com/spf13/cobra"
 
 	"git.arvan.me/arvan/cli/pkg/api"
-	"git.arvan.me/arvan/cli/pkg/utl"
 	"git.arvan.me/arvan/cli/pkg/config"
+	"git.arvan.me/arvan/cli/pkg/utl"
 )
 
 var (
@@ -39,7 +40,10 @@ func NewCmdLogin(in io.Reader, out, errout io.Writer) *cobra.Command {
 
 			apiKey := getApiKey(in, explainOut)
 
-			config.LoadConfigFile()
+			_, err = config.LoadConfigFile()
+			if err != nil {
+				log.Println(err)
+			}
 			arvanConfig := config.GetConfigInfo()
 
 			arvanConfig.Initiate(apiKey, region)
@@ -50,7 +54,6 @@ func NewCmdLogin(in io.Reader, out, errout io.Writer) *cobra.Command {
 			utl.CheckErr(err)
 
 			fmt.Fprintf(explainOut, "Configuration saved successfully.\n")
-
 
 			_, err = isAuthorized(apiKey)
 			utl.CheckErr(err)
@@ -76,7 +79,7 @@ func getApiKey(in io.Reader, writer io.Writer) string {
 	defaultVal := arvanConfig.GetApiKey()
 
 	if len(defaultVal) > 0 {
-		inputExplain = fmt.Sprintf("%s[%s]: ",inputExplain , defaultVal)
+		inputExplain = fmt.Sprintf("%s[%s]: ", inputExplain, defaultVal)
 	}
 
 	return utl.ReadInput(inputExplain, defaultVal, writer, in, apiKeyValidator)
@@ -84,12 +87,11 @@ func getApiKey(in io.Reader, writer io.Writer) string {
 
 func apiKeyValidator(input string) (bool, error) {
 	var validApiKey = regexp.MustCompile(`^Apikey [a-z0-9\-]+$$`)
-	if (!validApiKey.MatchString(input)){
+	if !validApiKey.MatchString(input) {
 		return false, errors.New("API token should be in format: 'Apikey xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'")
 	}
 	return true, nil
 }
-
 
 // getSelectedRegion #TODO implement getSelectedRegion
 func getSelectedRegion(in io.Reader, writer io.Writer) (string, error) {
@@ -110,14 +112,16 @@ func getSelectedRegion(in io.Reader, writer io.Writer) (string, error) {
 	explain := "Select arvan region:\n"
 	explain += sprintRegions(activeRegions, inactiveRegions)
 
-	fmt.Fprintf(writer, explain)
-
+	_, err = fmt.Fprint(writer, explain)
+	if err != nil {
+		return "", err
+	}
 	inputExplain := "Region Number[1]: "
 
 	defaultVal := "1"
 
 	if len(activeRegions) == 1 {
-		fmt.Fprintf(writer, inputExplain + "1\n")
+		fmt.Fprintf(writer, inputExplain+"1\n")
 		return activeRegions[0].Name, nil
 	}
 
@@ -137,14 +141,14 @@ func (r regionValidator) validate(input string) (bool, error) {
 	intInput, err := strconv.Atoi(input)
 	if err != nil || intInput < 1 || intInput > r.upperBound {
 		return false, fmt.Errorf("enter a number between '1' and '%d'\n", r.upperBound)
-	} 
+	}
 	return true, nil
 }
 
 func sprintRegions(activeRegions, inactiveRegions []api.Region) string {
 	result := ""
 	for i := 0; i < len(activeRegions); i++ {
-		result += fmt.Sprintf("  [%d] %s\n", i+1 , activeRegions[i].Name)
+		result += fmt.Sprintf("  [%d] %s\n", i+1, activeRegions[i].Name)
 	}
 	for i := 0; i < len(inactiveRegions); i++ {
 		result += fmt.Sprintf("  [-] %s (inactive)\n", inactiveRegions[i].Name)
@@ -152,7 +156,7 @@ func sprintRegions(activeRegions, inactiveRegions []api.Region) string {
 	return result
 }
 
-func getActiveAndInactiveRegins(regions []api.Region) ([]api.Region, []api.Region){
+func getActiveAndInactiveRegins(regions []api.Region) ([]api.Region, []api.Region) {
 	var activeRegions, inactiveRegions []api.Region
 	for i := 0; i < len(regions); i++ {
 		if regions[i].Active {

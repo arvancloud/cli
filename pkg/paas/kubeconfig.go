@@ -131,15 +131,6 @@ func currentContextExistsAndValid(currentContext string, contexts []KubeContext)
 	return false
 }
 
-func contains(s []string, e string) bool {
-	for _, a := range s {
-		if a == e {
-			return true
-		}
-	}
-	return false
-}
-
 func writeKubeConfig(kubeConfig KubeConfig, path string) error {
 	kcBytes, err := yaml.Marshal(kubeConfig)
 	if err != nil {
