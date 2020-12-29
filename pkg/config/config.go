@@ -3,7 +3,6 @@ package config
 import (
 	"errors"
 	"io/ioutil"
-	"log"
 	"sync"
 
 	"gopkg.in/yaml.v2"
@@ -23,10 +22,7 @@ var once sync.Once
 func GetConfigInfo() *ConfigInfo {
 	once.Do(func() {
 		instance = &ConfigInfo{}
-		err := instance.Complete()
-		if err != nil {
-			log.Println(err)
-		}
+		_ = instance.Complete()
 	})
 	return instance
 }
