@@ -5,7 +5,6 @@ import (
 	"github.com/arvancloud/cli/pkg/api"
 	"github.com/arvancloud/cli/pkg/utl"
 	"github.com/inconshreveable/go-update"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -40,10 +39,8 @@ var (
 // NewCommandCLI return new cobra cli
 func NewCommandCLI() *cobra.Command {
 	// Load ConfigInfo from default path if exists
-	_, err := config.LoadConfigFile()
-	if err != nil {
-		log.Println(err)
-	}
+	_, _ = config.LoadConfigFile()
+
 
 	in, out, errout := os.Stdin, os.Stdout, os.Stderr
 	// Main command
