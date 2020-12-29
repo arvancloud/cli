@@ -1,0 +1,29 @@
+  builds:
+    - id: arvan
+      main: ./cmd/arvan/arvan.go
+      binary: arvan
+      goos:
+        - linux
+        - darwin
+        - windows
+      goarch:
+        - amd64
+        - "386"
+      ldflags:
+        - -s -w
+        - -X 'k8s.io/client-go/pkg/version.gitVersion=v{{.Version}}'
+        - -X 'k8s.io/client-go/pkg/version.gitCommit={{.Commit}}'
+        - -X 'github.com/openshift/oc/pkg/version.versionFromGit=v{{.Version}}'
+        - -X 'github.com/openshift/oc/pkg/version.commitFromGit={{.Commit}}'
+      hooks:
+        post:
+          - upx -7 "{{ .Path }}"
+  archives:
+    -
+      format_overrides:
+        - goos: windows
+          format: zip
+      files:
+        - none*
+      name_template: 'arvan_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ if .Arm
+        }}v{{ .Arm }}{{ end }}{{ if .Mips }}_{{ .Mips }}{{ end }}'

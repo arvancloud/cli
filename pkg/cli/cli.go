@@ -2,11 +2,18 @@ package cli
 
 import (
 	"fmt"
+	"git.arvan.me/arvan/cli/pkg/api"
+	"git.arvan.me/arvan/cli/pkg/utl"
+	"github.com/inconshreveable/go-update"
+	"log"
+	"net/http"
 	"os"
+	"path/filepath"
+	"runtime"
 
 	"github.com/spf13/cobra"
 
-	"github.com/openshift/origin/pkg/cmd/util/term"
+	"github.com/openshift/oc/pkg/helpers/term"
 
 	"git.arvan.me/arvan/cli/pkg/config"
 	"git.arvan.me/arvan/cli/pkg/login"
@@ -33,7 +40,10 @@ var (
 // NewCommandCLI return new cobra cli
 func NewCommandCLI() *cobra.Command {
 	// Load ConfigInfo from default path if exists
-	config.LoadConfigFile()
+	_, err := config.LoadConfigFile()
+	if err != nil {
+		log.Println(err)
+	}
 
 	in, out, errout := os.Stdin, os.Stdout, os.Stderr
 	// Main command
@@ -46,9 +56,7 @@ func NewCommandCLI() *cobra.Command {
 			c.SetOutput(explainOut)
 			fmt.Fprintf(explainOut, "%s\n\n%s\n", cliLong, cliExplain)
 		},
-		BashCompletionFunction: bashCompletionFunc,
 	}
-
 
 	optionsCommand := newCmdOptions()
 	cmd.AddCommand(optionsCommand)
@@ -56,9 +64,10 @@ func NewCommandCLI() *cobra.Command {
 	loginCommand := login.NewCmdLogin(in, out, errout)
 	cmd.AddCommand(loginCommand)
 
-	paasCommand := paas.NewCmdPaas(in, out, errout)
+	paasCommand := paas.NewCmdPaas()
 	cmd.AddCommand(paasCommand)
 
+	cmd.AddCommand(updateCmd())
 	return cmd
 }
 
@@ -71,5 +80,43 @@ func newCmdOptions() *cobra.Command {
 		},
 	}
 
+	return cmd
+}
+
+// updateCmd updates cli
+func updateCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "update",
+		Short: "Update arvan cli",
+		Run: func(cmd *cobra.Command, args []string) {
+			newVersion, err := api.CheckUpdate()
+			utl.CheckErr(err)
+			if newVersion == nil {
+				fmt.Println("arvan cli is up to date ")
+				return
+			}
+			fmt.Println("update started ...")
+			resp, err := http.Get(newVersion.URL)
+			if err != nil {
+				utl.CheckErr(err)
+			}
+			defer resp.Body.Close()
+			var cliName string
+			if runtime.GOOS == "windows" {
+				_, err := utl.Unzip(os.TempDir(), resp.Body)
+				utl.CheckErr(err)
+				cliName = "arvan.exe"
+			} else {
+				err = utl.Untar(os.TempDir(), resp.Body)
+				utl.CheckErr(err)
+				cliName = "arvan"
+			}
+
+			reader, err := os.Open(filepath.Join(os.TempDir(), cliName))
+			utl.CheckErr(err)
+			err = update.Apply(reader, update.Options{})
+			fmt.Println("update finished successfully :)")
+		},
+	}
 	return cmd
 }

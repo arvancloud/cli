@@ -5,13 +5,17 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
+	"git.arvan.me/arvan/cli/pkg/api"
+	"github.com/openshift/oc/pkg/version"
 	"io/ioutil"
+	"k8s.io/client-go/rest"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
+	"text/tabwriter"
 
-	oc "github.com/openshift/origin/pkg/oc/cli"
+	"git.arvan.me/arvan/cli/pkg/oc"
 	"github.com/spf13/cobra"
 
 	"git.arvan.me/arvan/cli/pkg/config"
@@ -20,26 +24,36 @@ import (
 
 const (
 	kubeConfigFileName = "paasconfig"
-	apiKeyHeaderKey    = "Apikey"
 	paasUrlInfix       = "/paas/v1/regions/"
 	paasUrlPostfix     = "/o/"
 	whoAmIPath         = "apis/user.openshift.io/v1/users/~"
 	projectListPath    = "apis/project.openshift.io/v1/projects"
 )
 
-type whoAmIMetadata struct {
-	name string
-}
-
 // NewCmdPaas return new cobra cli for paas
-func NewCmdPaas(in io.Reader, out, errout io.Writer) *cobra.Command {
+func NewCmdPaas() *cobra.Command {
 
-	// #TODO do not hardcode InsecureSkipVerify
-	paasCommand := oc.InitiatedCommand("paas", "arvan paas")
+	paasCommand := oc.InitiatedCommand()
 
 	paasCommand.PersistentPreRun = func(cmd *cobra.Command, args []string) {
 		err := preparePaasAuthentication(cmd)
 		utl.CheckErr(err)
+		update, err := api.CheckUpdate()
+		if err != nil {
+			return
+		}
+		if update != nil {
+			w := new(tabwriter.Writer)
+			w.Init(os.Stdout, 4, 4, 0, '\t', 0)
+			defer w.Flush()
+			currentVersionInfo, _, err := version.ExtractVersion()
+			utl.CheckErr(err)
+			fmt.Fprint(w, strings.Repeat("*", 50))
+			fmt.Fprint(w, fmt.Sprintf("\n\tUpdate available %s -> %s\t", currentVersionInfo.GitVersion, update.Version))
+			fmt.Fprint(w, "\n\tRun 'arvan update' to update\n")
+			fmt.Fprint(w, strings.Repeat("*", 50))
+			fmt.Fprint(w, "\n")
+		}
 	}
 
 	return paasCommand
@@ -67,16 +81,22 @@ func preparePaasAuthentication(cmd *cobra.Command) error {
 	}
 
 	projects, err := projectList()
-
+	if err != nil {
+		return err
+	}
 	if len(projects) == 0 && cmd.Name() != "new-project" {
 		return errors.New("no project found. \n To get started create new project using \"arvan paas new-project NAME\".")
 	}
 
 	kubeConfigPath := paasConfigPath()
-	setConfigFlag(cmd, kubeConfigPath)
-
-	syncKubeConfig(kubeConfigPath, username, projects)
-
+	err = setConfigFlag(cmd, kubeConfigPath)
+	if err != nil {
+		return err
+	}
+	err = syncKubeConfig(kubeConfigPath, username, projects)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -90,17 +110,22 @@ func paasConfigPath() string {
 	}
 }
 
-func setConfigFlag(cmd *cobra.Command, kubeConfigPath string) {
-	if len(cmd.Flags().Lookup("config").Value.String()) == 0 {
-		cmd.Flags().Lookup("config").Value.Set(kubeConfigPath)
+func setConfigFlag(cmd *cobra.Command, kubeConfigPath string) error {
+	if len(cmd.Flags().Lookup("kubeconfig").Value.String()) == 0 {
+		return cmd.Flags().Lookup("kubeconfig").Value.Set(kubeConfigPath)
 	}
+	return nil
 }
 
 // #TODO Implement whoAmI
 func whoAmI() (string, int, error) {
 	httpReq, err := http.NewRequest("GET", getArvanPaasServerBase()+whoAmIPath, nil)
+	if err != nil {
+		return "", 0, err
+	}
 	httpReq.Header.Add("accept", "application/json")
 	httpReq.Header.Add("authorization", getArvanAuthorization())
+	httpReq.Header.Add("User-Agent", rest.DefaultKubernetesUserAgent())
 	httpResp, err := http.DefaultClient.Do(httpReq)
 	if err != nil {
 		return "", 0, err
@@ -153,8 +178,12 @@ func whoAmI() (string, int, error) {
 
 func projectList() ([]string, error) {
 	httpReq, err := http.NewRequest("GET", getArvanPaasServerBase()+projectListPath, nil)
+	if err != nil {
+		return nil, err
+	}
 	httpReq.Header.Add("accept", "application/json")
 	httpReq.Header.Add("authorization", getArvanAuthorization())
+	httpReq.Header.Add("User-Agent", rest.DefaultKubernetesUserAgent())
 	httpResp, err := http.DefaultClient.Do(httpReq)
 	if err != nil {
 		return nil, err
@@ -163,7 +192,9 @@ func projectList() ([]string, error) {
 	// read body
 	defer httpResp.Body.Close()
 	body, err := ioutil.ReadAll(httpResp.Body)
-
+	if err != nil {
+		return nil, err
+	}
 	// parse response
 	var objmap map[string]*json.RawMessage
 
