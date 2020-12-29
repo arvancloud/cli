@@ -6,7 +6,7 @@ import (
 	"runtime"
 	"time"
 
-	"git.arvan.me/arvan/cli/pkg/cli"
+	"github.com/arvancloud/cli/pkg/cli"
 )
 
 func main() {

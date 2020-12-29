@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"git.arvan.me/arvan/cli/pkg/api"
+	"github.com/arvancloud/cli/pkg/api"
 	"github.com/openshift/oc/pkg/version"
 	"io/ioutil"
 	"k8s.io/client-go/rest"
@@ -15,11 +15,11 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"git.arvan.me/arvan/cli/pkg/oc"
+	"github.com/arvancloud/cli/pkg/oc"
 	"github.com/spf13/cobra"
 
-	"git.arvan.me/arvan/cli/pkg/config"
-	"git.arvan.me/arvan/cli/pkg/utl"
+	"github.com/arvancloud/cli/pkg/config"
+	"github.com/arvancloud/cli/pkg/utl"
 )
 
 const (

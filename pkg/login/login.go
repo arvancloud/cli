@@ -11,9 +11,9 @@ import (
 	"github.com/openshift/oc/pkg/helpers/term"
 	"github.com/spf13/cobra"
 
-	"git.arvan.me/arvan/cli/pkg/api"
-	"git.arvan.me/arvan/cli/pkg/config"
-	"git.arvan.me/arvan/cli/pkg/utl"
+	"github.com/arvancloud/cli/pkg/api"
+	"github.com/arvancloud/cli/pkg/config"
+	"github.com/arvancloud/cli/pkg/utl"
 )
 
 var (
