@@ -1,4 +1,4 @@
-module git.arvan.me/arvan/cli
+module github.com/arvancloud/cli
 
 go 1.15
 

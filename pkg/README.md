@@ -82,7 +82,7 @@ func NewCmdExample(in io.Reader, out, errout io.Writer) *cobra.Command {
 }
 ```
 
-You can access all authentication information and general configurations of `arvan cli` by getting arvan config object using `config.GetConfigInfo()` from `git.arvan.me/arvan/cli/pkg/config`.
+You can access all authentication information and general configurations of `arvan cli` by getting arvan config object using `config.GetConfigInfo()` from `github.com/arvancloud/cli/pkg/config`.
 
 After you initialized and prepared your command add it to `arvan cli` as subcommand in `pkg/cli/cli.go`:
 
@@ -93,7 +93,7 @@ import (
     .
     .
     .
-	"git.arvan.me/arvan/cli/pkg/example"
+	"github.com/arvancloud/cli/pkg/example"
 )
 
 func NewCommandCLI() *cobra.Command {

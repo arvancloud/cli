@@ -2,8 +2,8 @@ package cli
 
 import (
 	"fmt"
-	"git.arvan.me/arvan/cli/pkg/api"
-	"git.arvan.me/arvan/cli/pkg/utl"
+	"github.com/arvancloud/cli/pkg/api"
+	"github.com/arvancloud/cli/pkg/utl"
 	"github.com/inconshreveable/go-update"
 	"log"
 	"net/http"
@@ -15,9 +15,9 @@ import (
 
 	"github.com/openshift/oc/pkg/helpers/term"
 
-	"git.arvan.me/arvan/cli/pkg/config"
-	"git.arvan.me/arvan/cli/pkg/login"
-	"git.arvan.me/arvan/cli/pkg/paas"
+	"github.com/arvancloud/cli/pkg/config"
+	"github.com/arvancloud/cli/pkg/login"
+	"github.com/arvancloud/cli/pkg/paas"
 )
 
 var (

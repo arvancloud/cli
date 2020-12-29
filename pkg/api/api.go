@@ -3,7 +3,7 @@ package api
 import (
 	"encoding/json"
 	"errors"
-	"git.arvan.me/arvan/cli/pkg/config"
+	"github.com/arvancloud/cli/pkg/config"
 	"io/ioutil"
 	"k8s.io/client-go/rest"
 	"net/http"
