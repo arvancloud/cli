@@ -1,6 +1,6 @@
 module github.com/arvancloud/cli
 
-go 1.15
+go 1.16
 
 require (
 	github.com/MakeNowJust/heredoc v1.0.0
