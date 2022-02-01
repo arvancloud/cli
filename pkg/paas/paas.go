@@ -59,8 +59,16 @@ func NewCmdPaas() *cobra.Command {
 	return paasCommand
 }
 
-func preparePaasAuthentication(cmd *cobra.Command) error {
+func setArvanBuilder(cmd *cobra.Command) error {
+	if cmd.Name() == "new-app" {
+		if strings.HasPrefix(cmd.Flags().Args()[0], "https") || strings.HasPrefix(cmd.Flags().Args()[0], "http") {
+			cmd.Flags().Args()[0] = "arvanbuilder:ArvanBuilder~"+cmd.Flags().Args()[0]
+		}
+	}
+	return nil
+}
 
+func preparePaasAuthentication(cmd *cobra.Command) error {
 	arvanConfig := config.GetConfigInfo()
 
 	if len(arvanConfig.GetApiKey()) == 0 {
@@ -93,6 +101,12 @@ func preparePaasAuthentication(cmd *cobra.Command) error {
 	if err != nil {
 		return err
 	}
+
+	err = setArvanBuilder(cmd)
+	if err != nil {
+		return err
+	}
+
 	err = syncKubeConfig(kubeConfigPath, username, projects)
 	if err != nil {
 		return err

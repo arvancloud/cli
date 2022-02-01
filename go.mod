@@ -5,8 +5,6 @@ go 1.16
 require (
 	github.com/MakeNowJust/heredoc v1.0.0
 	github.com/Microsoft/go-winio v0.4.16 // indirect
-	github.com/alexbrainman/sspi v0.0.0-20200928142253-2a432fede40d // indirect
-	github.com/apcera/gssapi v0.0.0-20161010215902-5fb4217df13b // indirect
 	github.com/aws/aws-sdk-go v1.36.7 // indirect
 	github.com/containerd/continuity v0.0.0-20201208142359-180525291bb7 // indirect
 	github.com/containers/image v3.0.2+incompatible // indirect
@@ -23,7 +21,6 @@ require (
 	github.com/openshift/library-go v0.0.0-20201211095848-8399bf6288d6
 	github.com/openshift/oc v0.0.0-alpha.0.0.20201210232229-4ebfe9cad4c3
 	github.com/spf13/cobra v1.1.1
-	github.com/spf13/pflag v1.0.5
 	github.com/xeipuuv/gojsonschema v1.2.0 // indirect
 	gopkg.in/yaml.v2 v2.3.0
 	k8s.io/api v0.20.0-beta.2
@@ -48,7 +45,7 @@ replace (
 	github.com/openshift/api => github.com/openshift/api v0.0.0-20201119144013-9f0856e7c657
 	github.com/openshift/client-go => github.com/openshift/client-go v0.0.0-20201119144744-148025d790a9
 	github.com/openshift/library-go => github.com/openshift/library-go v0.0.0-20201119162840-a8387fdfa05b
-	github.com/openshift/oc => github.com/arvancloud/oc v0.0.0-alpha.0.0.20201229052306-dff55bd9edf0
+	github.com/openshift/oc => github.com/arvancloud/oc v0.0.0-alpha.0.0.20220201225934-5f7714a898fa
 
 	golang.org/x/crypto => golang.org/x/crypto v0.0.0-20200220183623-bac4c82f6975
 
