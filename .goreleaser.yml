@@ -1,14 +1,47 @@
   builds:
-    - id: arvan
+    - id: arvan_linux
+      env:
+      - CGO_ENABLED=0    
       main: ./cmd/arvan/arvan.go
       binary: arvan
       goos:
         - linux
-        - darwin
+      goarch:
+        - amd64
+      ldflags:
+        - -s -w
+        - -X 'k8s.io/client-go/pkg/version.gitVersion=v{{.Version}}'
+        - -X 'k8s.io/client-go/pkg/version.gitCommit={{.Commit}}'
+        - -X 'github.com/openshift/oc/pkg/version.versionFromGit=v{{.Version}}'
+        - -X 'github.com/openshift/oc/pkg/version.commitFromGit={{.Commit}}'
+      hooks:
+        post:
+          - upx -7 "{{ .Path }}"
+    - id: arvan_windows
+      env:
+      - CGO_ENABLED=1    
+      main: ./cmd/arvan/arvan.go
+      binary: arvan
+      goos:
         - windows
       goarch:
         - amd64
-        - "386"
+      ldflags:
+        - -s -w
+        - -X 'k8s.io/client-go/pkg/version.gitVersion=v{{.Version}}'
+        - -X 'k8s.io/client-go/pkg/version.gitCommit={{.Commit}}'
+        - -X 'github.com/openshift/oc/pkg/version.versionFromGit=v{{.Version}}'
+        - -X 'github.com/openshift/oc/pkg/version.commitFromGit={{.Commit}}'
+      hooks:
+        post:
+          - upx -7 "{{ .Path }}"
+    - id: arvan_darwin  
+      main: ./cmd/arvan/arvan.go
+      binary: arvan
+      goos:
+        - darwin
+      goarch:
+        - amd64
       ldflags:
         - -s -w
         - -X 'k8s.io/client-go/pkg/version.gitVersion=v{{.Version}}'
