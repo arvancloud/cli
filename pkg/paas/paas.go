@@ -13,7 +13,6 @@ import (
 	"text/tabwriter"
 
 	"github.com/arvancloud/cli/pkg/api"
-	"github.com/arvancloud/cli/pkg/login"
 	"github.com/openshift/oc/pkg/version"
 	"k8s.io/client-go/rest"
 
@@ -39,10 +38,10 @@ func NewCmdPaas() *cobra.Command {
 
 	in, out, errout := os.Stdin, os.Stdout, os.Stderr
 
-	paasCommand.AddCommand(login.NewCmdSwitchRegion(in, out, errout))
+	paasCommand.AddCommand(NewCmdSwitchRegion(in, out, errout))
 
 	paasCommand.PersistentPreRun = func(cmd *cobra.Command, args []string) {
-		err := preparePaasAuthentication(cmd)
+		err := prepareCommand(cmd)
 		utl.CheckErr(err)
 		update, err := api.CheckUpdate()
 		if err != nil {
@@ -74,13 +73,7 @@ func setArvanBuilder(cmd *cobra.Command) error {
 	return nil
 }
 
-func preparePaasAuthentication(cmd *cobra.Command) error {
-	arvanConfig := config.GetConfigInfo()
-
-	if len(arvanConfig.GetApiKey()) == 0 {
-		return errors.New("no authorization credentials provided. \nTry \"arvan login\"")
-	}
-
+func prepareConfig(cmd *cobra.Command) error {
 	// #TODO do not use InsecureSkipVerify
 	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	username, httpStatusCode, err := whoAmI()
@@ -103,21 +96,25 @@ func preparePaasAuthentication(cmd *cobra.Command) error {
 	}
 
 	kubeConfigPath := paasConfigPath()
-	err = setConfigFlag(cmd, kubeConfigPath)
-	if err != nil {
-		return err
-	}
-
-	err = setArvanBuilder(cmd)
-	if err != nil {
-		return err
-	}
-
 	err = syncKubeConfig(kubeConfigPath, username, projects)
 	if err != nil {
 		return err
 	}
 	return nil
+}
+
+func prepareCommand(cmd *cobra.Command) error {
+	arvanConfig := config.GetConfigInfo()
+	kubeConfigPath := paasConfigPath()
+	err := setConfigFlag(cmd, kubeConfigPath)
+	if err != nil {
+		return err
+	}
+	if len(arvanConfig.GetApiKey()) == 0 {
+		return errors.New("no authorization credentials provided. \nTry \"arvan login\"")
+	}
+
+	return setArvanBuilder(cmd)
 }
 
 func paasConfigPath() string {

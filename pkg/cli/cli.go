@@ -15,7 +15,6 @@ import (
 	"github.com/openshift/oc/pkg/helpers/term"
 
 	"github.com/arvancloud/cli/pkg/config"
-	"github.com/arvancloud/cli/pkg/login"
 	"github.com/arvancloud/cli/pkg/paas"
 )
 
@@ -57,7 +56,7 @@ func NewCommandCLI() *cobra.Command {
 	optionsCommand := newCmdOptions()
 	cmd.AddCommand(optionsCommand)
 
-	loginCommand := login.NewCmdLogin(in, out, errout)
+	loginCommand := paas.NewCmdLogin(in, out, errout)
 	cmd.AddCommand(loginCommand)
 
 	paasCommand := paas.NewCmdPaas()

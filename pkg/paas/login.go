@@ -1,4 +1,4 @@
-package login
+package paas
 
 import (
 	"errors"
@@ -56,11 +56,13 @@ func NewCmdLogin(in io.Reader, out, errout io.Writer) *cobra.Command {
 			_, err = arvanConfig.SaveConfig()
 			utl.CheckErr(err)
 
-			fmt.Fprintf(explainOut, "Configuration saved successfully.\n")
-
 			_, err = isAuthorized(apiKey)
 			utl.CheckErr(err)
 
+			if c != nil {
+				err = prepareConfig(c)
+			}
+			utl.CheckErr(err)
 			fmt.Fprintf(explainOut, "Valid Authorization credentials. Logged in successfully!\n")
 		},
 	}
@@ -95,10 +97,10 @@ func NewCmdSwitchRegion(in io.Reader, out, errout io.Writer) *cobra.Command {
 			_, err = arvanConfig.SaveConfig()
 			utl.CheckErr(err)
 
-			fmt.Fprintf(explainOut, "Region Switched successfully.\n")
-
-			_, err = isAuthorized(arvanConfig.GetApiKey())
+			err = prepareConfig(c)
 			utl.CheckErr(err)
+
+			fmt.Fprintf(explainOut, "Region Switched successfully.\n")
 		},
 	}
 
