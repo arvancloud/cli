@@ -17,9 +17,6 @@ type ConfigInfo struct {
 	// base url to access arvan api server
 	server string
 
-	// Arvan region
-	region string
-
 	// an api key used to authorize request to arvan api server
 	apiKey string
 
@@ -33,11 +30,6 @@ type ConfigInfo struct {
 //GetServer returns base url to access arvan api server
 func (c *ConfigInfo) GetServer() string {
 	return c.server
-}
-
-//GetRegion returns Arvan region
-func (c *ConfigInfo) GetRegion() string {
-	return c.region
 }
 
 //GetApiKey returns an api key used to authorize request to arvan api server
@@ -55,9 +47,9 @@ func (c *ConfigInfo) GetHomeDir() string {
 	return c.homeDir
 }
 
-func (c *ConfigInfo) Initiate(apiKey, region string) {
+func (c *ConfigInfo) Initiate(apiKey string, zone Zone) {
+	c.server = "https://" + zone.Endpoint
 	c.apiKey = apiKey
-	c.region = region
 }
 
 func (c *ConfigInfo) Complete() error {
@@ -101,7 +93,6 @@ func (c *ConfigInfo) SaveConfig() (bool, error) {
 	configFileStruct := configFile{
 		ApiVersion: configFileApiVersion,
 		Server:     c.server,
-		Region:     c.region,
 		ApiKey:     c.apiKey,
 	}
 
@@ -116,9 +107,7 @@ func (c *ConfigInfo) SaveConfig() (bool, error) {
 	}
 	return true, nil
 }
-func (c *ConfigInfo) RegionProvided() bool {
-	return len(c.region) > 0
-}
+
 func (c *ConfigInfo) ServerProvided() bool {
 	return len(c.server) > 0
 }
@@ -141,7 +130,6 @@ func defaultConfigFilePath(homeDir string) string {
 	return homeDir + "/config"
 }
 
-// #TODO implement default server address
 func serverAddress() string {
 	return "https://napi.arvancloud.com"
 }

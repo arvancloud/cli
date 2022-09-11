@@ -11,7 +11,6 @@ import (
 type configFile struct {
 	ApiVersion string `yaml:"apiVersion"`
 	Server     string `yaml:"server"`
-	Region     string `yaml:"region"`
 	ApiKey     string `yaml:"apikey"`
 }
 
@@ -42,7 +41,6 @@ func LoadConfigFile() (bool, error) {
 			return false, err
 		}
 		arvanConfig.apiKey = configFileStruct.ApiKey
-		arvanConfig.region = configFileStruct.Region
 		arvanConfig.server = configFileStruct.Server
 		return true, nil
 	}

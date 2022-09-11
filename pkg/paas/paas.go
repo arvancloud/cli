@@ -5,15 +5,17 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/arvancloud/cli/pkg/api"
-	"github.com/openshift/oc/pkg/version"
 	"io/ioutil"
-	"k8s.io/client-go/rest"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
 	"text/tabwriter"
+
+	"github.com/arvancloud/cli/pkg/api"
+	"github.com/arvancloud/cli/pkg/login"
+	"github.com/openshift/oc/pkg/version"
+	"k8s.io/client-go/rest"
 
 	"github.com/arvancloud/cli/pkg/oc"
 	"github.com/spf13/cobra"
@@ -24,16 +26,20 @@ import (
 
 const (
 	kubeConfigFileName = "paasconfig"
-	paasUrlInfix       = "/paas/v1/regions/"
 	paasUrlPostfix     = "/o/"
 	whoAmIPath         = "apis/user.openshift.io/v1/users/~"
 	projectListPath    = "apis/project.openshift.io/v1/projects"
 )
 
+
 // NewCmdPaas return new cobra cli for paas
 func NewCmdPaas() *cobra.Command {
 
 	paasCommand := oc.InitiatedCommand()
+
+	in, out, errout := os.Stdin, os.Stdout, os.Stderr
+
+	paasCommand.AddCommand(login.NewCmdSwitchRegion(in, out, errout))
 
 	paasCommand.PersistentPreRun = func(cmd *cobra.Command, args []string) {
 		err := preparePaasAuthentication(cmd)
@@ -62,7 +68,7 @@ func NewCmdPaas() *cobra.Command {
 func setArvanBuilder(cmd *cobra.Command) error {
 	if cmd.Name() == "new-app" {
 		if strings.HasPrefix(cmd.Flags().Args()[0], "https") || strings.HasPrefix(cmd.Flags().Args()[0], "http") {
-			cmd.Flags().Args()[0] = "arvanbuilder:ArvanBuilder~"+cmd.Flags().Args()[0]
+			cmd.Flags().Args()[0] = "arvanbuilder:ArvanBuilder~" + cmd.Flags().Args()[0]
 		}
 	}
 	return nil
@@ -260,8 +266,7 @@ func getArvanAuthorization() string {
 func getArvanPaasServerBase() string {
 	arvanConfig := config.GetConfigInfo()
 	arvanServer := arvanConfig.GetServer()
-	region := arvanConfig.GetRegion()
-	return arvanServer + paasUrlInfix + region + paasUrlPostfix
+	return arvanServer +  paasUrlPostfix
 }
 
 func syncKubeConfig(path, username string, projects []string) error {

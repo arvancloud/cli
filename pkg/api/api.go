@@ -3,28 +3,28 @@ package api
 import (
 	"encoding/json"
 	"errors"
-	"github.com/arvancloud/cli/pkg/config"
 	"io/ioutil"
-	"k8s.io/client-go/rest"
 	"net/http"
+	"net/url"
+
+	"github.com/arvancloud/cli/pkg/config"
+	"k8s.io/client-go/rest"
 )
 
 var Version string
 
 const (
-	apiPrefix       = "/paas/v1/regions/"
-	defaultRegion   = "ir-thr-at1"
-	regionsEndpoint = "/g/regions"
+	regionsEndpoint = "/paas/v1/zones"
 	userEndpoint    = "/g/user"
 	updateEndpoint  = "/update"
-	updateServer = "https://cli.arvan.run"
+	updateServer    = "https://cli.arvan.run"
 )
 
 //GetUserInfo returns a dictionary of user info if authentication credentials is valid.
 func GetUserInfo(apikey string) (map[string]string, error) {
 	arvanConfig := config.GetConfigInfo()
 	arvanServer := arvanConfig.GetServer()
-	httpReq, err := http.NewRequest("GET", arvanServer+apiPrefix+defaultRegion+userEndpoint, nil)
+	httpReq, err := http.NewRequest("GET", arvanServer+userEndpoint, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -59,21 +59,26 @@ func GetUserInfo(apikey string) (map[string]string, error) {
 	return user, nil
 }
 
-// Region of PaaS service
-type Region struct {
-	Name   string
-	Active bool
-}
 
-//GetRegions from PaaS API
-func GetRegions() ([]Region, error) {
-	var regions []Region
+//GetZones from PaaS API
+func GetZones() (config.Region, error) {
+	var regions config.Region
 	arvanConfig := config.GetConfigInfo()
-	arvanServer := arvanConfig.GetServer()
-	httpReq, err := http.NewRequest("GET", arvanServer+apiPrefix+defaultRegion+regionsEndpoint, nil)
+	arvanURL, err := url.Parse(arvanConfig.GetServer())
+	if err != nil {
+		return regions, nil
+	}
+	
+	httpReq, err := http.NewRequest("GET", arvanURL.Scheme + "://" + arvanURL.Host+regionsEndpoint, nil)
 	if err != nil {
 		return regions, err
 	}
+
+	apikey := arvanConfig.GetApiKey()
+	if apikey != "" {
+		httpReq.Header.Add("Authorization", apikey)
+	}
+
 	httpReq.Header.Add("accept", "application/json")
 	httpReq.Header.Add("User-Agent", rest.DefaultKubernetesUserAgent())
 	httpResp, err := http.DefaultClient.Do(httpReq)

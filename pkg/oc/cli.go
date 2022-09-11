@@ -208,7 +208,6 @@ func NewOcCommand(in io.Reader, out, errout io.Writer) *cobra.Command {
 
 	changeSharedFlagDefaults(cmds)
 
-
 	cmds.AddCommand(newExperimentalCommand(f, ioStreams))
 
 	cmds.AddCommand(kubectlwrappers.NewCmdPlugin(f, ioStreams))

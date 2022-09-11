@@ -41,7 +41,6 @@ func NewCommandCLI() *cobra.Command {
 	// Load ConfigInfo from default path if exists
 	_, _ = config.LoadConfigFile()
 
-
 	in, out, errout := os.Stdin, os.Stdout, os.Stderr
 	// Main command
 	cmd := &cobra.Command{
@@ -62,7 +61,7 @@ func NewCommandCLI() *cobra.Command {
 	cmd.AddCommand(loginCommand)
 
 	paasCommand := paas.NewCmdPaas()
-	cmd.AddCommand(paasCommand)
+	cmd.AddCommand(paasCommand)	
 
 	cmd.AddCommand(updateCmd())
 	return cmd

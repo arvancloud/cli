@@ -22,6 +22,10 @@ var (
 
     First-time users of the client should run this command to connect to a Arvan API,
     establish an authenticated session, and save connection to the configuration file.`
+
+	SwitchRegionLong = `
+	Switch region to connect to different zones.
+	`
 )
 
 // NewCmdLogin returns new cobra commad enables user to login to arvan servers
@@ -37,7 +41,6 @@ func NewCmdLogin(in io.Reader, out, errout io.Writer) *cobra.Command {
 
 			region, err := getSelectedRegion(in, explainOut)
 			utl.CheckErr(err)
-
 			apiKey := getApiKey(in, explainOut)
 
 			_, err = config.LoadConfigFile()
@@ -46,7 +49,7 @@ func NewCmdLogin(in io.Reader, out, errout io.Writer) *cobra.Command {
 			}
 			arvanConfig := config.GetConfigInfo()
 
-			arvanConfig.Initiate(apiKey, region)
+			arvanConfig.Initiate(apiKey, *region)
 
 			utl.CheckErr(arvanConfig.Complete())
 
@@ -59,6 +62,43 @@ func NewCmdLogin(in io.Reader, out, errout io.Writer) *cobra.Command {
 			utl.CheckErr(err)
 
 			fmt.Fprintf(explainOut, "Valid Authorization credentials. Logged in successfully!\n")
+		},
+	}
+
+	return cmd
+}
+
+// NewCmdLogin returns new cobra commad enables user to switch region
+func NewCmdSwitchRegion(in io.Reader, out, errout io.Writer) *cobra.Command {
+	// Main command
+	cmd := &cobra.Command{
+		Use:   "region",
+		Short: "Switch region",
+		Long:  SwitchRegionLong,
+		Run: func(c *cobra.Command, args []string) {
+			explainOut := term.NewResponsiveWriter(out)
+			c.SetOutput(explainOut)
+
+			region, err := getSelectedRegion(in, explainOut)
+			utl.CheckErr(err)
+			
+			_, err = config.LoadConfigFile()
+			if err != nil {
+				log.Println(err)
+			}
+			arvanConfig := config.GetConfigInfo()
+
+			arvanConfig.Initiate(arvanConfig.GetApiKey(), *region)
+
+			utl.CheckErr(arvanConfig.Complete())
+
+			_, err = arvanConfig.SaveConfig()
+			utl.CheckErr(err)
+
+			fmt.Fprintf(explainOut, "Region Switched successfully.\n")
+
+			_, err = isAuthorized(arvanConfig.GetApiKey())
+			utl.CheckErr(err)
 		},
 	}
 
@@ -94,43 +134,43 @@ func apiKeyValidator(input string) (bool, error) {
 }
 
 // getSelectedRegion #TODO implement getSelectedRegion
-func getSelectedRegion(in io.Reader, writer io.Writer) (string, error) {
-	regions, err := api.GetRegions()
+func getSelectedRegion(in io.Reader, writer io.Writer) (*config.Zone, error) {
+	regions, err := api.GetZones()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	if len(regions) < 1 {
-		return "", errors.New("invalid region info")
+	if len(regions.Zones) < 1 {
+		return nil, errors.New("invalid region info")
 	}
 
-	activeRegions, inactiveRegions := getActiveAndInactiveRegins(regions)
+	activeZones, inactiveZones := getActiveAndInactiveZones(regions.Zones)
 
-	if len(activeRegions) < 1 {
-		return "", errors.New("no active region available")
+	if len(activeZones) < 1 {
+		return nil, errors.New("no active region available")
 	}
 
 	explain := "Select arvan region:\n"
-	explain += sprintRegions(activeRegions, inactiveRegions)
+	explain += sprintRegions(activeZones, inactiveZones)
 
 	_, err = fmt.Fprint(writer, explain)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	inputExplain := "Region Number[1]: "
 
 	defaultVal := "1"
 
-	if len(activeRegions) == 1 {
+	if len(activeZones) == 1 {
 		fmt.Fprintf(writer, inputExplain+"1\n")
-		return activeRegions[0].Name, nil
+		return &activeZones[0], nil
 	}
 
-	validator := regionValidator{len(activeRegions)}
+	validator := regionValidator{len(activeZones)}
 
 	regionIndex := utl.ReadInput(inputExplain, defaultVal, writer, in, validator.validate)
 	intIndex, _ := strconv.Atoi(regionIndex)
 
-	return activeRegions[intIndex-1].Name, nil
+	return &activeZones[intIndex-1], nil
 }
 
 type regionValidator struct {
@@ -145,25 +185,45 @@ func (r regionValidator) validate(input string) (bool, error) {
 	return true, nil
 }
 
-func sprintRegions(activeRegions, inactiveRegions []api.Region) string {
+func sprintRegions(activeZones, inactiveRegions []config.Zone) string {
 	result := ""
-	for i := 0; i < len(activeRegions); i++ {
-		result += fmt.Sprintf("  [%d] %s\n", i+1, activeRegions[i].Name)
+	var activeZoneIndex int 
+	for i := 0; i < len(activeZones); i++ {
+		if activeZones[i].Default {
+			activeZoneIndex++
+			log.Println(activeZones[i].Release)
+
+			if activeZones[i].Release == "STABLE" {
+				result += fmt.Sprintf("  [%d] %s-%s\n", activeZoneIndex, activeZones[i].RegionName, activeZones[i].Name)
+			} else {
+				result += fmt.Sprintf("  [%d] %s-%s(%s)\n", activeZoneIndex, activeZones[i].RegionName, activeZones[i].Name, activeZones[i].Release)
+			}
+			
+		}
 	}
+	for i := 0; i < len(activeZones); i++ {
+		if !activeZones[i].Default {
+			activeZoneIndex++
+			if activeZones[i].Release == "STABLE" {
+				result += fmt.Sprintf("  [%d] %s-%s\n", activeZoneIndex, activeZones[i].RegionName, activeZones[i].Name)
+			} else {
+				result += fmt.Sprintf("  [%d] %s-%s(%s)\n", activeZoneIndex, activeZones[i].RegionName, activeZones[i].Name, activeZones[i].Release)
+			}
+		}	}
 	for i := 0; i < len(inactiveRegions); i++ {
-		result += fmt.Sprintf("  [-] %s (inactive)\n", inactiveRegions[i].Name)
+		result += fmt.Sprintf("  [-] %s-%s (inactive)\n", inactiveRegions[i].RegionName, inactiveRegions[i].Name)
 	}
 	return result
 }
 
-func getActiveAndInactiveRegins(regions []api.Region) ([]api.Region, []api.Region) {
-	var activeRegions, inactiveRegions []api.Region
-	for i := 0; i < len(regions); i++ {
-		if regions[i].Active {
-			activeRegions = append(activeRegions, regions[i])
+func getActiveAndInactiveZones(zones []config.Zone) ([]config.Zone, []config.Zone) {
+	var activeZones, inactiveZones []config.Zone
+	for i := 0; i < len(zones); i++ {
+		if zones[i].Active {
+			activeZones = append(activeZones, zones[i])
 		} else {
-			inactiveRegions = append(inactiveRegions, regions[i])
+			inactiveZones = append(inactiveZones, zones[i])
 		}
 	}
-	return activeRegions, inactiveRegions
+	return activeZones, inactiveZones
 }

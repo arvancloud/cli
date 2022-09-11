@@ -22,6 +22,7 @@ require (
 	github.com/openshift/oc v0.0.0-alpha.0.0.20201210232229-4ebfe9cad4c3
 	github.com/spf13/cobra v1.1.1
 	github.com/xeipuuv/gojsonschema v1.2.0 // indirect
+	golang.org/x/sys v0.0.0-20220808155132-1c4a2a72c664 // indirect
 	gopkg.in/yaml.v2 v2.3.0
 	k8s.io/api v0.20.0-beta.2
 	k8s.io/apimachinery v0.20.0-beta.2
