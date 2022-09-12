@@ -48,9 +48,7 @@
         - -X 'k8s.io/client-go/pkg/version.gitCommit={{.Commit}}'
         - -X 'github.com/openshift/oc/pkg/version.versionFromGit=v{{.Version}}'
         - -X 'github.com/openshift/oc/pkg/version.commitFromGit={{.Commit}}'
-      hooks:
-        post:
-          - upx -7 "{{ .Path }}"
+
     - id: arvan_darwin_arm64
       main: ./cmd/arvan/arvan.go
       binary: arvan
@@ -64,9 +62,7 @@
         - -X 'k8s.io/client-go/pkg/version.gitCommit={{.Commit}}'
         - -X 'github.com/openshift/oc/pkg/version.versionFromGit=v{{.Version}}'
         - -X 'github.com/openshift/oc/pkg/version.commitFromGit={{.Commit}}'
-      hooks:
-        post:
-          - upx -7 "{{ .Path }}"
+
   archives:
     -
       format_overrides:
