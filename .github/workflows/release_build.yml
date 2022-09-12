@@ -23,7 +23,7 @@ jobs:
         id: go
 
       - name: Install Prerequisites
-        run: sudo apt install -y libgpgme-dev
+        run: sudo apt install -y libgpgme-dev upx
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@master
