@@ -110,6 +110,11 @@ func updateCmd() *cobra.Command {
 			reader, err := os.Open(filepath.Join(os.TempDir(), cliName))
 			utl.CheckErr(err)
 			err = update.Apply(reader, update.Options{})
+			if err != nil {
+				update.RollbackError(err)
+				fmt.Println(err)
+				utl.CheckErr(fmt.Errorf("update failed :("))
+			}
 			fmt.Println("update finished successfully :)")
 		},
 	}
