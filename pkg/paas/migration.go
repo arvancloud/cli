@@ -11,6 +11,7 @@ import (
 
 	"github.com/arvancloud/cli/pkg/config"
 	"github.com/arvancloud/cli/pkg/utl"
+
 	"github.com/openshift/oc/pkg/helpers/term"
 	"github.com/spf13/cobra"
 )
@@ -89,7 +90,9 @@ func getSelectedProject(in io.Reader, writer io.Writer) (string, error) {
 
 	defaultVal := "1"
 
-	projectIndex, err := strconv.Atoi(utl.ReadInput(inputExplain, defaultVal, writer, in, projectValidator))
+	validator := projectValidator{len(projects)}
+
+	projectIndex, err := strconv.Atoi(utl.ReadInput(inputExplain, defaultVal, writer, in, validator.validate))
 	if err != nil {
 		return "", err
 	}
@@ -97,7 +100,15 @@ func getSelectedProject(in io.Reader, writer io.Writer) (string, error) {
 	return projects[projectIndex-1], nil
 }
 
-func projectValidator(input string) (bool, error) {
+type projectValidator struct {
+	upperBound int
+}
+
+func (p projectValidator) validate(input string) (bool, error) {
+	intInput, err := strconv.Atoi(input)
+	if err != nil || intInput < 1 || intInput > p.upperBound {
+		return false, fmt.Errorf("enter a number between '1' and '%d'\n", p.upperBound)
+	}
 	return true, nil
 }
 
