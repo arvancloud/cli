@@ -61,9 +61,6 @@ func NewCommandCLI() *cobra.Command {
 	paasCommand := paas.NewCmdPaas()
 	cmd.AddCommand(paasCommand)
 
-	migrateCommand := paas.NewCmdMigrate(in, out, errout)
-	cmd.AddCommand(migrateCommand)
-
 	cmd.AddCommand(updateCmd())
 	return cmd
 }
