@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"strconv"
 	"strings"
 	"time"
 
@@ -16,14 +17,15 @@ import (
 
 const (
 	checkmark = "[\u2713]"
+	at1       = "ir-thr-ba1"
 )
 
-// NewCmdMigrate returns new cobra commad enables user to migrate objects to another region on arvan servers
+// NewCmdMigrate returns new cobra commad enables user to migrate projects to another region on arvan servers
 func NewCmdMigrate(in io.Reader, out, errout io.Writer) *cobra.Command {
 	// Main command
 	cmd := &cobra.Command{
 		Use:   "migrate",
-		Short: "Migrate to region",
+		Short: "Migrate namespaces to destination region",
 		Long:  loginLong,
 		Run: func(c *cobra.Command, args []string) {
 			/* TODO
@@ -36,13 +38,15 @@ func NewCmdMigrate(in io.Reader, out, errout io.Writer) *cobra.Command {
 			explainOut := term.NewResponsiveWriter(out)
 			c.SetOutput(explainOut)
 
+			project, _ := getSelectedProject(in, explainOut)
+			fmt.Println("migrating project:", project)
+
 			currentRegionName := getCurrentRegion()
 
-			if currentRegionName == "ir-thr-ba1" {
+			if currentRegionName == at1 {
 				log.Printf("migration from region %s is not possible now\nplease first switch your region using command:\n\n \tarvan paas region\n\n", currentRegionName)
 				return
 			}
-			log.Println(currentRegionName)
 
 			region, err := getSelectedRegion(in, explainOut)
 			utl.CheckErr(err)
@@ -54,11 +58,9 @@ func NewCmdMigrate(in io.Reader, out, errout io.Writer) *cobra.Command {
 
 			fmt.Println(getRegionFromEndpoint(region.Endpoint))
 
-			project, _ := getSelectedProject(in, explainOut)
-			fmt.Println("migrating project: ", project)
 			migrationSteps()
 
-			fmt.Fprintf(explainOut, "All objects migrated successfully!\n")
+			fmt.Fprintf(explainOut, "All namespaces migrated successfully!\n")
 		},
 	}
 
@@ -67,9 +69,11 @@ func NewCmdMigrate(in io.Reader, out, errout io.Writer) *cobra.Command {
 
 func getSelectedProject(in io.Reader, writer io.Writer) (string, error) {
 	projects, err := projectList()
+
 	if err != nil {
 		return "", err
 	}
+
 	if len(projects) < 1 {
 		return "", errors.New("no project to migrate")
 	}
@@ -85,7 +89,12 @@ func getSelectedProject(in io.Reader, writer io.Writer) (string, error) {
 
 	defaultVal := "1"
 
-	return utl.ReadInput(inputExplain, defaultVal, writer, in, projectValidator), nil
+	projectIndex, err := strconv.Atoi(utl.ReadInput(inputExplain, defaultVal, writer, in, projectValidator))
+	if err != nil {
+		return "", err
+	}
+
+	return projects[projectIndex-1], nil
 }
 
 func projectValidator(input string) (bool, error) {
@@ -110,12 +119,12 @@ func getRegionFromEndpoint(endpoint string) string {
 func sprintProjects(projects []string) string {
 	result := ""
 	var projectIndex int
+
 	for i := 0; i < len(projects); i++ {
 		projectIndex++
-		log.Println(projects[i])
-
 		result += fmt.Sprintf("  [%d] %s\n", projectIndex, projects[i])
 	}
+
 	return result
 }
 
