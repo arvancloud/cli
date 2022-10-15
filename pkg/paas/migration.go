@@ -52,6 +52,11 @@ func NewCmdMigrate(in io.Reader, out, errout io.Writer) *cobra.Command {
 
 			fmt.Println(getRegionFromEndpoint(region.Endpoint))
 
+			confirmed := migrationConfirm(project, region.Name, in, explainOut)
+			if !confirmed {
+				return
+			}
+
 			migrationSteps()
 
 			fmt.Fprintf(explainOut, "All namespaces migrated successfully!\n")
@@ -130,6 +135,31 @@ func sprintProjects(projects []string) string {
 	}
 
 	return result
+}
+
+func migrationConfirm(project, region string, in io.Reader, writer io.Writer) bool {
+	explain := fmt.Sprintf("You're about to migrate \"%s\" to region \"%s\" :\n", project, region)
+
+	_, err := fmt.Fprint(writer, explain)
+	if err != nil {
+		return false
+	}
+	inputExplain := "Are you sure?[Y/n]: "
+
+	defaultVal := "Y"
+
+	value := utl.ReadInput(inputExplain, defaultVal, writer, in, confirmationValidate)
+	if value != "Y" {
+		return false
+	}
+	return true
+}
+
+func confirmationValidate(input string) (bool, error) {
+	if input != "Y" && input != "n" {
+		return false, fmt.Errorf("enter a valid answer 'Y' for \"yes\" or 'n' for \"no\"")
+	}
+	return true, nil
 }
 
 func migrationSteps() {
