@@ -13,11 +13,11 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"text/tabwriter"
-	"time"
 
+	"github.com/arvancloud/cli/pkg/api"
 	"github.com/arvancloud/cli/pkg/config"
 	"github.com/arvancloud/cli/pkg/utl"
+	"github.com/olekukonko/tablewriter"
 	"k8s.io/client-go/rest"
 
 	"github.com/openshift/oc/pkg/helpers/term"
@@ -36,8 +36,9 @@ const (
 	xmark                      = "[x]"
 	redColor                   = "\033[31m"
 	greenColor                 = "\033[32m"
+	yellowColor                = "\033[33m"
 	resetColor                 = "\033[0m"
-	bamdad                     = "ir-thr-ba1"
+	bamdad                     = "ba1"
 	targetMigrationDestination = "destination"
 	targetMigrationSource      = "source"
 )
@@ -91,7 +92,7 @@ func NewCmdMigrate(in io.Reader, out, errout io.Writer) *cobra.Command {
 				return
 			}
 
-			destinationRegion, err := getSelectedRegion(in, explainOut)
+			destinationRegion, err := GetZone(bamdad)
 			utl.CheckErr(err)
 
 			if currentRegionName == getRegionFromEndpoint(destinationRegion.Endpoint) {
@@ -99,9 +100,7 @@ func NewCmdMigrate(in io.Reader, out, errout io.Writer) *cobra.Command {
 				return
 			}
 
-			fmt.Println(getRegionFromEndpoint(destinationRegion.Endpoint))
-
-			confirmed := migrationConfirm(project, destinationRegion.Name, in, explainOut)
+			confirmed := migrationConfirm(project, getRegionFromEndpoint(destinationRegion.Endpoint), in, explainOut)
 			if !confirmed {
 				return
 			}
@@ -111,6 +110,7 @@ func NewCmdMigrate(in io.Reader, out, errout io.Writer) *cobra.Command {
 				SourceRegion:      currentRegionName,
 				DestinationRegion: destinationRegion.RegionName,
 			}
+
 			migrationSteps(migration)
 		},
 	}
@@ -190,23 +190,29 @@ func sprintProjects(projects []string) string {
 }
 
 func migrationConfirm(project, region string, in io.Reader, writer io.Writer) bool {
-	explain := fmt.Sprintf("You're about to migrate \"%s\" to region \"%s\" :\n", project, region)
+	explain := fmt.Sprintf("You're about to migrate \"%s\" to region \"%s\".\n", project, region)
 
 	_, err := fmt.Fprint(writer, explain)
 	if err != nil {
 		return false
 	}
-	inputExplain := "Are you sure?[Y/n]: "
+	inputExplain := fmt.Sprintf("This will STOP your applications.\nPlease enter project's name [%s] to proceed:\n", project)
 
-	defaultVal := "Y"
+	defaultVal := ""
 
-	value := utl.ReadInput(inputExplain, defaultVal, writer, in, confirmationValidate)
-	return value == "Y"
+	v := confirmationValidator{project: project}
+
+	value := utl.ReadInput(inputExplain, defaultVal, writer, in, v.confirmationValidate)
+	return value == project
 }
 
-func confirmationValidate(input string) (bool, error) {
-	if input != "Y" && input != "n" {
-		return false, fmt.Errorf("enter a valid answer 'Y' for \"yes\" or 'n' for \"no\"")
+type confirmationValidator struct {
+	project string
+}
+
+func (v confirmationValidator) confirmationValidate(input string) (bool, error) {
+	if input != v.project {
+		return false, fmt.Errorf("please enter project name: \"%s\"", v.project)
 	}
 	return true, nil
 }
@@ -222,161 +228,13 @@ func migrationSteps(migration Migration) error {
 		7. Finalize Destination (input: status(call on success) - region(destination), target(source/destination)) (success output: {[]services[{name,ip}], routes[{name,address,isFree(bool)}], gateway(string)})
 		Final Output report: compare services name to display old and new ips also for routes
 	*/
-	_, err := Prepare(migration.Namespace, migration.DestinationRegion, targetMigrationDestination)
-	if err != nil {
-		failureOutput()
 
-		return err
-	}
-
-	time.Sleep(70 * time.Millisecond)
-
-	prepareSourceResponse, err := Prepare(migration.Namespace, migration.SourceRegion, targetMigrationSource)
-	if err != nil {
-		Finilize(prepareSourceResponse.Status, migration.SourceRegion, targetMigrationSource)
-		failureOutput()
-
-		return err
-	}
-	time.Sleep(200 * time.Millisecond)
-	backupManifestsResponse, err := BackupManifests(migration.Namespace, migration.SourceRegion)
-	if err != nil {
-		Finilize(backupManifestsResponse.Status, migration.SourceRegion, targetMigrationSource)
-		Finilize(backupManifestsResponse.Status, migration.DestinationRegion, targetMigrationDestination)
-		failureOutput()
-
-		return err
-	}
-	time.Sleep(500 * time.Millisecond)
-	restoreManifestsResponse, err := RestoreManifests(migration.Namespace, migration.DestinationRegion)
-	if err != nil {
-		Finilize(restoreManifestsResponse.Status, migration.SourceRegion, targetMigrationSource)
-		Finilize(restoreManifestsResponse.Status, migration.DestinationRegion, targetMigrationDestination)
-		failureOutput()
-
-		return err
-	}
-	time.Sleep(1000 * time.Microsecond)
-	syncImagesResponse, err := SyncImages(migration.Namespace)
-	if err != nil {
-		Finilize(syncImagesResponse.Status, migration.SourceRegion, targetMigrationSource)
-		Finilize(syncImagesResponse.Status, migration.DestinationRegion, targetMigrationDestination)
-		failureOutput()
-
-		return err
-	}
-	time.Sleep(70 * time.Millisecond)
-	cloneVolumesResponse, err := CloneVolumes(migration.Namespace)
-	if err != nil {
-		Finilize(cloneVolumesResponse.Status, migration.SourceRegion, targetMigrationSource)
-		Finilize(cloneVolumesResponse.Status, migration.DestinationRegion, targetMigrationDestination)
-		failureOutput()
-
-		return err
-	}
-	time.Sleep(3000 * time.Millisecond)
-	sourceRegionFinalizeResponse, err := Finilize(200, migration.SourceRegion, targetMigrationSource)
-	if err != nil {
-		failureOutput()
-
-		return err
-	}
-	time.Sleep(700 * time.Millisecond)
-	destinationbRegionFinalizeResponse, err := Finilize(200, migration.DestinationRegion, targetMigrationDestination)
-	if err != nil {
-		failureOutput()
-
-		return err
-	}
+	sourceRegionFinalizeResponse := &Response{Services: []Service{{Name: "name1", IP: "1.1.1.1"}}, Routes: []Route{{Name: "route1-0", Address: "https://route1-0/", IsFree: true}, {Name: "route1-1", Address: "https://route1-1/", IsFree: false}}, Gateway: "gateway1"}
+	destinationbRegionFinalizeResponse := &Response{Services: []Service{{Name: "name2", IP: "2.2.2.2"}}, Routes: []Route{{Name: "route2-0", Address: "https://route2-0/", IsFree: true}, {Name: "route2-1", Address: "https://route2-1/", IsFree: false}}, Gateway: "gateway2"}
 
 	successOutput(sourceRegionFinalizeResponse, destinationbRegionFinalizeResponse)
 
 	return nil
-}
-
-func Prepare(ns, region, target string) (*Response, error) {
-	fmt.Print("- Preparing ", region)
-
-	completeURL, err := url.Parse(migrationServer + prepareEndpoint)
-	if err != nil {
-		return nil, err
-	}
-
-	payload := Request{
-		Namespace: ns,
-		Target:    target,
-	}
-
-	return HttpPost(*completeURL, payload)
-}
-
-func SyncImages(ns string) (*Response, error) {
-	fmt.Println(" ", checkmark)
-	fmt.Print("- Syncing Images")
-
-	completeURL, err := url.Parse(migrationServer + syncImagesEndpoint)
-	if err != nil {
-		return nil, err
-	}
-
-	return HttpPost(*completeURL, nil)
-}
-
-func CloneVolumes(ns string) (*Response, error) {
-	fmt.Println(" ", checkmark)
-	fmt.Print("- Cloning Volumes")
-
-	completeURL, err := url.Parse(migrationServer + cloneVolumesEndpoint)
-	if err != nil {
-		return nil, err
-	}
-
-	return HttpPost(*completeURL, nil)
-}
-
-func BackupManifests(ns, region string) (*Response, error) {
-	fmt.Println(" ", checkmark)
-	fmt.Print("- Saving Manifests Backups")
-
-	completeURL, err := url.Parse(migrationServer + backupManifestsEndpoint)
-	if err != nil {
-		return nil, err
-	}
-
-	return HttpPost(*completeURL, nil)
-}
-
-func RestoreManifests(ns, region string) (*Response, error) {
-	fmt.Println(" ", checkmark)
-	fmt.Print("- Restoring Manifests")
-
-	completeURL, err := url.Parse(migrationServer + restoreManifestsEndpoint)
-	if err != nil {
-		return nil, err
-	}
-
-	return HttpPost(*completeURL, nil)
-}
-
-func Finilize(status int, region, target string) (*Response, error) {
-	fmt.Println(" ", checkmark)
-	fmt.Print("- Finilize ", region)
-
-	_, err := url.Parse(migrationServer + finalizeEndpoint)
-	if err != nil {
-		return nil, err
-	}
-
-	completeURL, err := url.Parse(migrationServer + finalizeEndpoint)
-	if err != nil {
-		return nil, err
-	}
-
-	payload := Request{
-		Target: target,
-	}
-
-	return HttpPost(*completeURL, payload)
 }
 
 func HttpPost(u url.URL, payload interface{}) (*Response, error) {
@@ -421,25 +279,90 @@ func HttpPost(u url.URL, payload interface{}) (*Response, error) {
 }
 
 func failureOutput() {
-	fmt.Println(" ", xmark)
 	fmt.Println("failed to migrate")
 }
 
 func successOutput(source, destination *Response) {
-	fmt.Println(" ", checkmark)
+	fmt.Println("Your IPs changed successfully")
 
-	w := new(tabwriter.Writer)
-	w.Init(os.Stdout, 0, 12, 1, '\t', tabwriter.AlignRight)
-
-	defer w.Flush()
+	ipTable := tablewriter.NewWriter(os.Stdout)
+	ipTable.SetHeader([]string{"Old IPs", "New IPs"})
 
 	for i := 0; i < len(source.Services); i++ {
-		fmt.Fprintln(w, "\t", redColor, source.Services[i].IP, "\t", resetColor, "-->", "\t", greenColor, destination.Services[i].IP)
+		ipTable.Append([]string{redColor + source.Services[i].IP + resetColor, greenColor + destination.Services[i].IP + resetColor})
 	}
+
+	ipTable.Render()
+
+	freeSourceRoutes := make([]Route, 0)
+	freeDestinationRoutes := make([]Route, 0)
+	nonfreeSourceRoutes := make([]Route, 0)
+	nonfreeDestinationRoutes := make([]Route, 0)
 
 	for i := 0; i < len(source.Routes); i++ {
-		fmt.Fprintln(w, "\t", redColor, source.Routes[i].Name, "\t", resetColor, "-->", "\t", greenColor, destination.Routes[i].Name)
+		if source.Routes[i].IsFree {
+			freeSourceRoutes = append(freeSourceRoutes, source.Routes[i])
+			freeDestinationRoutes = append(freeDestinationRoutes, destination.Routes[i])
+		} else {
+			nonfreeSourceRoutes = append(nonfreeSourceRoutes, source.Routes[i])
+			nonfreeDestinationRoutes = append(nonfreeDestinationRoutes, destination.Routes[i])
+		}
 	}
 
-	fmt.Fprintln(w, "\t", redColor, source.Gateway, "\t", resetColor, "-->", "\t", greenColor, destination.Gateway)
+	if len(freeSourceRoutes) > 0 {
+		fmt.Println("Your free routes changed successfully:")
+
+		freeRouteTable := tablewriter.NewWriter(os.Stdout)
+		freeRouteTable.SetHeader([]string{"old free routes", "new free routes"})
+
+		for i := 0; i < len(freeSourceRoutes); i++ {
+			freeRouteTable.Append([]string{redColor + freeSourceRoutes[i].Address + resetColor, greenColor + freeDestinationRoutes[i].Address + resetColor})
+		}
+
+		freeRouteTable.Render()
+	}
+
+	if len(nonfreeSourceRoutes) > 0 {
+		nonFreeRouteTable := tablewriter.NewWriter(os.Stdout)
+		nonFreeRouteTable.SetHeader([]string{"non-free routes"})
+
+		for i := 0; i < len(nonfreeSourceRoutes); i++ {
+			nonFreeRouteTable.Append([]string{yellowColor + nonfreeDestinationRoutes[i].Address + resetColor})
+		}
+
+		nonFreeRouteTable.Render()
+	}
+
+	gatewayTable := tablewriter.NewWriter(os.Stdout)
+	gatewayTable.SetHeader([]string{"old gateway", "new gateway"})
+
+	fmt.Println("For non-free domains above, please change your gateway in your DNS provider as bellow:")
+	gatewayTable.Append([]string{redColor + source.Gateway + resetColor, greenColor + destination.Gateway + resetColor})
+	gatewayTable.Render()
+}
+
+func GetZone(target string) (*config.Zone, error) {
+	regions, err := api.GetZones()
+	if err != nil {
+		return nil, err
+	}
+	if len(regions.Zones) < 1 {
+		return nil, errors.New("invalid region info")
+	}
+
+	activeZones, _ := getActiveAndInactiveZones(regions.Zones)
+
+	if len(activeZones) < 1 {
+		return nil, errors.New("no active region available")
+	}
+
+	for i, zone := range activeZones {
+		if zone.Name == target {
+			return &activeZones[i], nil
+		}
+	}
+
+	log.Printf("destination region not found")
+
+	return nil, nil
 }
