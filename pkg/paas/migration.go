@@ -6,10 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
-	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -25,40 +23,18 @@ import (
 )
 
 const (
-	prepareEndpoint            = "/prepare"
-	backupManifestsEndpoint    = "/backup"
-	restoreManifestsEndpoint   = "/restore"
-	syncImagesEndpoint         = "/sync"
-	cloneVolumesEndpoint       = "/clone"
-	finalizeEndpoint           = "/finalize"
-	migrationServer            = "https://cli.arvan.run"
-	checkmark                  = "[\u2713]"
-	xmark                      = "[x]"
-	redColor                   = "\033[31m"
-	greenColor                 = "\033[32m"
-	yellowColor                = "\033[33m"
-	resetColor                 = "\033[0m"
-	bamdad                     = "ba1"
-	targetMigrationDestination = "destination"
-	targetMigrationSource      = "source"
+	migrationEndpoint = "/migrations"
+	redColor          = "\033[31m"
+	greenColor        = "\033[32m"
+	yellowColor       = "\033[33m"
+	resetColor        = "\033[0m"
+	bamdad            = "ba1"
 )
 
-type Migration struct {
-	Namespace         string
-	SourceRegion      string
-	DestinationRegion string
-}
-
 type Request struct {
-	Namespace string
-	Target    string
-}
-
-type Response struct {
-	Services []Service
-	Routes   []Route
-	Gateway  string
-	Status   int
+	Namespace   string `json:"namespace"`
+	Source      string `json:"source"`
+	Destination string `json:"destination"`
 }
 
 type Service struct {
@@ -70,6 +46,18 @@ type Route struct {
 	Name    string
 	Address string
 	IsFree  bool
+}
+
+type ZoneInfo struct {
+	Services []Service `json:"services"`
+	Routes   []Route   `json:"routes"`
+	Gateway  string    `json:"gateway"`
+}
+
+type Response struct {
+	Source      ZoneInfo `json:"source"`
+	Destination ZoneInfo `json:"destination"`
+	Status      int      `json:"status"`
 }
 
 // NewCmdMigrate returns new cobra commad enables user to migrate namespaces to another region on arvan servers.
@@ -91,7 +79,7 @@ func NewCmdMigrate(in io.Reader, out, errout io.Writer) *cobra.Command {
 				return
 			}
 
-			destinationRegion, err := GetZone(bamdad)
+			destinationRegion, err := getZoneByName(bamdad)
 			utl.CheckErr(err)
 
 			if currentRegionName == getRegionFromEndpoint(destinationRegion.Endpoint) {
@@ -104,13 +92,13 @@ func NewCmdMigrate(in io.Reader, out, errout io.Writer) *cobra.Command {
 				return
 			}
 
-			migration := Migration{
-				Namespace:         project,
-				SourceRegion:      currentRegionName,
-				DestinationRegion: destinationRegion.RegionName,
+			requset := Request{
+				Namespace:   project,
+				Source:      currentRegionName,
+				Destination: destinationRegion.RegionName,
 			}
 
-			migrationSteps(migration)
+			migrate(requset)
 		},
 	}
 
@@ -201,7 +189,7 @@ func migrationConfirm(project, region string, in io.Reader, writer io.Writer) bo
 	if err != nil {
 		return false
 	}
-	inputExplain := fmt.Sprintf(yellowColor+"\nWARNING: This will STOP your applications."+resetColor+"\n\nPlease enter project's name [%s] to proceed: ", project)
+	inputExplain := fmt.Sprintf(yellowColor+"\nWARNING: This will STOP your applications during migration process."+resetColor+"\n\nPlease enter project's name [%s] to proceed: ", project)
 
 	defaultVal := ""
 
@@ -223,34 +211,31 @@ func (v confirmationValidator) confirmationValidate(input string) (bool, error) 
 	return true, nil
 }
 
-func migrationSteps(migration Migration) error {
-	/*
-		1. Prepare Destination (input: ns, region, target(source/destination)) (failure output: Display error and Return)
-		2. Prepare Source (input: ns, region, target(source/destination)) (failure output: SourceFinalize(input: fail status))
-		3. Backup Manifests (input: ns, region(source)) (failure output: SourceFinalize(input: fail status), DestinationFinalize(input: fail status))
-		4. Restore Manifests (input: ns, region(destination)) (failure output: SourceFinalize(input: fail status), DestinationFinalize(input: fail status))
-		5. SyncData including sync images and clone volumes (input: ns) (failure output: SourceFinalize(input: fail status), DestinationFinalize(input: fail status))
-		6. Finalize Source (input: status(call on success) - region(source), target(source/destination)) (success output: {[]services[{name,ip}], routes[{name,address,isFree(bool)}], gateway(string)})
-		7. Finalize Destination (input: status(call on success) - region(destination), target(source/destination)) (success output: {[]services[{name,ip}], routes[{name,address,isFree(bool)}], gateway(string)})
-		Final Output report: compare services name to display old and new ips also for routes
-	*/
+// migrate sends migration request and displays response.
+func migrate(request Request) error {
 
-	sourceRegionFinalizeResponse := &Response{Services: []Service{{Name: "name1", IP: "1.1.1.1"}}, Routes: []Route{{Name: "route1-0", Address: "https://route1-0/", IsFree: true}, {Name: "route1-1", Address: "https://route1-1/", IsFree: false}}, Gateway: "gateway1"}
-	destinationbRegionFinalizeResponse := &Response{Services: []Service{{Name: "name2", IP: "2.2.2.2"}}, Routes: []Route{{Name: "route2-0", Address: "https://route2-0/", IsFree: true}, {Name: "route2-1", Address: "https://route2-1/", IsFree: false}}, Gateway: "gateway2"}
+	response, err := httpPost(request)
+	if err != nil {
+		return err
+	}
 
-	successOutput(sourceRegionFinalizeResponse, destinationbRegionFinalizeResponse)
+	if response.Status == http.StatusOK {
+		successOutput(response)
+	}
+
+	failureOutput()
 
 	return nil
 }
 
-// HttpPost sends POST request to inserted url.
-func HttpPost(u url.URL, payload interface{}) (*Response, error) {
+// httpPost sends POST request to inserted url.
+func httpPost(payload interface{}) (*Response, error) {
 	requestBody, err := json.Marshal(payload)
 	if err != nil {
 		return nil, err
 	}
 
-	httpReq, err := http.NewRequest(http.MethodPost, migrationServer+prepareEndpoint, bytes.NewBuffer(requestBody))
+	httpReq, err := http.NewRequest(http.MethodPost, getArvanPaasServerBase()+migrationEndpoint, bytes.NewBuffer(requestBody))
 	if err != nil {
 		return nil, err
 	}
@@ -271,7 +256,7 @@ func HttpPost(u url.URL, payload interface{}) (*Response, error) {
 
 	// read body
 	defer httpResp.Body.Close()
-	responseBody, err := ioutil.ReadAll(httpResp.Body)
+	responseBody, err := io.ReadAll(httpResp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -291,14 +276,14 @@ func failureOutput() {
 }
 
 // successOutput displays success output.
-func successOutput(source, destination *Response) {
+func successOutput(response *Response) {
 	fmt.Println("\nYour IPs changed successfully")
 
 	ipTable := tablewriter.NewWriter(os.Stdout)
 	ipTable.SetHeader([]string{"Old IPs", "New IPs"})
 
-	for i := 0; i < len(source.Services); i++ {
-		ipTable.Append([]string{redColor + source.Services[i].IP + resetColor, greenColor + destination.Services[i].IP + resetColor})
+	for i := 0; i < len(response.Source.Services); i++ {
+		ipTable.Append([]string{redColor + response.Source.Services[i].IP + resetColor, greenColor + response.Destination.Services[i].IP + resetColor})
 	}
 
 	ipTable.Render()
@@ -308,13 +293,13 @@ func successOutput(source, destination *Response) {
 	nonfreeSourceRoutes := make([]Route, 0)
 	nonfreeDestinationRoutes := make([]Route, 0)
 
-	for i := 0; i < len(source.Routes); i++ {
-		if source.Routes[i].IsFree {
-			freeSourceRoutes = append(freeSourceRoutes, source.Routes[i])
-			freeDestinationRoutes = append(freeDestinationRoutes, destination.Routes[i])
+	for i := 0; i < len(response.Source.Routes); i++ {
+		if response.Source.Routes[i].IsFree {
+			freeSourceRoutes = append(freeSourceRoutes, response.Source.Routes[i])
+			freeDestinationRoutes = append(freeDestinationRoutes, response.Destination.Routes[i])
 		} else {
-			nonfreeSourceRoutes = append(nonfreeSourceRoutes, source.Routes[i])
-			nonfreeDestinationRoutes = append(nonfreeDestinationRoutes, destination.Routes[i])
+			nonfreeSourceRoutes = append(nonfreeSourceRoutes, response.Source.Routes[i])
+			nonfreeDestinationRoutes = append(nonfreeDestinationRoutes, response.Destination.Routes[i])
 		}
 	}
 
@@ -346,12 +331,12 @@ func successOutput(source, destination *Response) {
 	gatewayTable.SetHeader([]string{"old gateway", "new gateway"})
 
 	fmt.Println("For non-free domains above, please change your gateway in your DNS provider as bellow:")
-	gatewayTable.Append([]string{redColor + source.Gateway + resetColor, greenColor + destination.Gateway + resetColor})
+	gatewayTable.Append([]string{redColor + response.Source.Gateway + resetColor, greenColor + response.Destination.Gateway + resetColor})
 	gatewayTable.Render()
 }
 
-// GetZone gets target zone from list of active zones.
-func GetZone(target string) (*config.Zone, error) {
+// getZoneByName gets zone from list of active zones giving it's name.
+func getZoneByName(name string) (*config.Zone, error) {
 	regions, err := api.GetZones()
 	if err != nil {
 		return nil, err
@@ -367,7 +352,7 @@ func GetZone(target string) (*config.Zone, error) {
 	}
 
 	for i, zone := range activeZones {
-		if zone.Name == target {
+		if zone.Name == name {
 			return &activeZones[i], nil
 		}
 	}
