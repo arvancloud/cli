@@ -83,7 +83,6 @@ func NewCmdMigrate(in io.Reader, out, errout io.Writer) *cobra.Command {
 			c.SetOutput(explainOut)
 
 			project, _ := getSelectedProject(in, explainOut)
-			fmt.Println("migrating project:", project)
 
 			currentRegionName := getCurrentRegion()
 
@@ -190,13 +189,13 @@ func sprintProjects(projects []string) string {
 }
 
 func migrationConfirm(project, region string, in io.Reader, writer io.Writer) bool {
-	explain := fmt.Sprintf("You're about to migrate \"%s\" to region \"%s\".\n", project, region)
+	explain := fmt.Sprintf("\nYou're about to migrate \"%s\" from region \"%s\" to \"%s\".\n", project, getCurrentRegion(), region)
 
 	_, err := fmt.Fprint(writer, explain)
 	if err != nil {
 		return false
 	}
-	inputExplain := fmt.Sprintf("This will STOP your applications.\nPlease enter project's name [%s] to proceed:\n", project)
+	inputExplain := fmt.Sprintf(yellowColor+"\nWARNING: This will STOP your applications."+resetColor+"\n\nPlease enter project's name [%s] to proceed: ", project)
 
 	defaultVal := ""
 
@@ -212,7 +211,7 @@ type confirmationValidator struct {
 
 func (v confirmationValidator) confirmationValidate(input string) (bool, error) {
 	if input != v.project {
-		return false, fmt.Errorf("please enter project name: \"%s\"", v.project)
+		return false, fmt.Errorf("please enter project name correctly: \"%s\"", v.project)
 	}
 	return true, nil
 }
@@ -283,7 +282,7 @@ func failureOutput() {
 }
 
 func successOutput(source, destination *Response) {
-	fmt.Println("Your IPs changed successfully")
+	fmt.Println("\nYour IPs changed successfully")
 
 	ipTable := tablewriter.NewWriter(os.Stdout)
 	ipTable.SetHeader([]string{"Old IPs", "New IPs"})
