@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	migrationEndpoint = "/migrations"
+	migrationEndpoint = "/paas/v1/migrations"
 	redColor          = "\033[31m"
 	greenColor        = "\033[32m"
 	yellowColor       = "\033[33m"
@@ -38,14 +38,14 @@ type Request struct {
 }
 
 type Service struct {
-	Name string
-	IP   string
+	Name string `json:"name"`
+	IP   string `json:"ip"`
 }
 
 type Route struct {
-	Name    string
-	Address string
-	IsFree  bool
+	Name   string `json:"name"`
+	Host   string `json:"host"`
+	IsFree bool   `json:"is_free"`
 }
 
 type ZoneInfo struct {
@@ -310,7 +310,7 @@ func successOutput(response *Response) {
 		freeRouteTable.SetHeader([]string{"old free routes", "new free routes"})
 
 		for i := 0; i < len(freeSourceRoutes); i++ {
-			freeRouteTable.Append([]string{redColor + freeSourceRoutes[i].Address + resetColor, greenColor + freeDestinationRoutes[i].Address + resetColor})
+			freeRouteTable.Append([]string{redColor + freeSourceRoutes[i].Host + resetColor, greenColor + freeDestinationRoutes[i].Host + resetColor})
 		}
 
 		freeRouteTable.Render()
@@ -321,7 +321,7 @@ func successOutput(response *Response) {
 		nonFreeRouteTable.SetHeader([]string{"non-free routes"})
 
 		for i := 0; i < len(nonfreeSourceRoutes); i++ {
-			nonFreeRouteTable.Append([]string{yellowColor + nonfreeDestinationRoutes[i].Address + resetColor})
+			nonFreeRouteTable.Append([]string{yellowColor + nonfreeDestinationRoutes[i].Host + resetColor})
 		}
 
 		nonFreeRouteTable.Render()
