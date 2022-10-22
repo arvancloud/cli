@@ -213,8 +213,7 @@ func (v confirmationValidator) confirmationValidate(input string) (bool, error) 
 
 // migrate sends migration request and displays response.
 func migrate(request Request) error {
-
-	response, err := httpPost(request)
+	response, err := httpPost(migrationEndpoint, request)
 	if err != nil {
 		return err
 	}
@@ -229,13 +228,13 @@ func migrate(request Request) error {
 }
 
 // httpPost sends POST request to inserted url.
-func httpPost(payload interface{}) (*Response, error) {
+func httpPost(endpoint string, payload interface{}) (*Response, error) {
 	requestBody, err := json.Marshal(payload)
 	if err != nil {
 		return nil, err
 	}
 
-	httpReq, err := http.NewRequest(http.MethodPost, getArvanPaasServerBase()+migrationEndpoint, bytes.NewBuffer(requestBody))
+	httpReq, err := http.NewRequest(http.MethodPost, getArvanPaasServerBase()+endpoint, bytes.NewBuffer(requestBody))
 	if err != nil {
 		return nil, err
 	}
