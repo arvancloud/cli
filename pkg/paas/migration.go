@@ -72,7 +72,7 @@ type Route struct {
 	IsFree  bool
 }
 
-// NewCmdMigrate returns new cobra commad enables user to migrate projects to another region on arvan servers
+// NewCmdMigrate returns new cobra commad enables user to migrate namespaces to another region on arvan servers.
 func NewCmdMigrate(in io.Reader, out, errout io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "migrate",
@@ -117,6 +117,7 @@ func NewCmdMigrate(in io.Reader, out, errout io.Writer) *cobra.Command {
 	return cmd
 }
 
+// getSelectedProject gets intending namespace to migrate.
 func getSelectedProject(in io.Reader, writer io.Writer) (string, error) {
 	projects, err := projectList()
 
@@ -153,6 +154,7 @@ type projectValidator struct {
 	upperBound int
 }
 
+// validate makes sure the inserted namespace is correct.
 func (p projectValidator) validate(input string) (bool, error) {
 	intInput, err := strconv.Atoi(input)
 	if err != nil || intInput < 1 || intInput > p.upperBound {
@@ -161,6 +163,7 @@ func (p projectValidator) validate(input string) (bool, error) {
 	return true, nil
 }
 
+// getCurrentRegion returns users current region, fetched from config, in string.
 func getCurrentRegion() string {
 	_, err := config.LoadConfigFile()
 	utl.CheckErr(err)
@@ -170,12 +173,14 @@ func getCurrentRegion() string {
 	return getRegionFromEndpoint(arvanConfig.GetServer())
 }
 
+// getRegionFromEndpoint parses endpoint to return region name.
 func getRegionFromEndpoint(endpoint string) string {
 	currentRegionNameIndex := strings.LastIndex(endpoint, "/")
 
 	return endpoint[currentRegionNameIndex+1:]
 }
 
+// sprintProjects displays projects to select in lines.
 func sprintProjects(projects []string) string {
 	result := ""
 	var projectIndex int
@@ -188,6 +193,7 @@ func sprintProjects(projects []string) string {
 	return result
 }
 
+// migrationConfirm gets confirmation of proceeding namespace migration by asking user to enter namespace's name.
 func migrationConfirm(project, region string, in io.Reader, writer io.Writer) bool {
 	explain := fmt.Sprintf("\nYou're about to migrate \"%s\" from region \"%s\" to \"%s\".\n", project, getCurrentRegion(), region)
 
@@ -209,6 +215,7 @@ type confirmationValidator struct {
 	project string
 }
 
+// confirmationValidate makes sure that user enters namespace correctly.
 func (v confirmationValidator) confirmationValidate(input string) (bool, error) {
 	if input != v.project {
 		return false, fmt.Errorf("please enter project name correctly: \"%s\"", v.project)
@@ -236,6 +243,7 @@ func migrationSteps(migration Migration) error {
 	return nil
 }
 
+// HttpPost sends POST request to inserted url.
 func HttpPost(u url.URL, payload interface{}) (*Response, error) {
 	requestBody, err := json.Marshal(payload)
 	if err != nil {
@@ -277,10 +285,12 @@ func HttpPost(u url.URL, payload interface{}) (*Response, error) {
 	return &response, nil
 }
 
+// failureOutput displays failure output.
 func failureOutput() {
 	fmt.Println("failed to migrate")
 }
 
+// successOutput displays success output.
 func successOutput(source, destination *Response) {
 	fmt.Println("\nYour IPs changed successfully")
 
@@ -340,6 +350,7 @@ func successOutput(source, destination *Response) {
 	gatewayTable.Render()
 }
 
+// GetZone gets target zone from list of active zones.
 func GetZone(target string) (*config.Zone, error) {
 	regions, err := api.GetZones()
 	if err != nil {
