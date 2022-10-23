@@ -11,6 +11,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"net/url"
 
 	"github.com/arvancloud/cli/pkg/api"
 	"github.com/arvancloud/cli/pkg/config"
@@ -23,7 +24,7 @@ import (
 )
 
 const (
-	migrationEndpoint = "/paas/v1/migrations"
+	migrationEndpoint = "/paas/v1/migrate"
 	redColor          = "\033[31m"
 	greenColor        = "\033[32m"
 	yellowColor       = "\033[33m"
@@ -95,10 +96,13 @@ func NewCmdMigrate(in io.Reader, out, errout io.Writer) *cobra.Command {
 			requset := Request{
 				Namespace:   project,
 				Source:      currentRegionName,
-				Destination: destinationRegion.RegionName,
+				Destination: fmt.Sprintf("%s-%s", destinationRegion.RegionName, destinationRegion.Name),
 			}
 
-			migrate(requset)
+			err = migrate(requset)
+			if err != nil {
+				log.Println(err)
+			}
 		},
 	}
 
@@ -233,11 +237,21 @@ func httpPost(endpoint string, payload interface{}) (*Response, error) {
 	if err != nil {
 		return nil, err
 	}
+	arvanConfig := config.GetConfigInfo()
+	arvanURL, err := url.Parse(arvanConfig.GetServer())
+	if err != nil {
+		return nil, fmt.Errorf("invalid config")
+	}
 
-	httpReq, err := http.NewRequest(http.MethodPost, getArvanPaasServerBase()+endpoint, bytes.NewBuffer(requestBody))
+	httpReq, err := http.NewRequest(http.MethodPost, arvanURL.Scheme + "://" + arvanURL.Host+endpoint, bytes.NewBuffer(requestBody))
 	if err != nil {
 		return nil, err
 	}
+	apikey := arvanConfig.GetApiKey()
+	if apikey != "" {
+		httpReq.Header.Add("Authorization", apikey)
+	}
+
 	httpReq.Header.Add("accept", "application/json")
 	httpReq.Header.Add("User-Agent", rest.DefaultKubernetesUserAgent())
 	httpResp, err := http.DefaultClient.Do(httpReq)

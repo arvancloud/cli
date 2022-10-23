@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -66,7 +67,7 @@ func GetZones() (config.Region, error) {
 	arvanConfig := config.GetConfigInfo()
 	arvanURL, err := url.Parse(arvanConfig.GetServer())
 	if err != nil {
-		return regions, nil
+		return regions, fmt.Errorf("invalid config")
 	}
 	
 	httpReq, err := http.NewRequest("GET", arvanURL.Scheme + "://" + arvanURL.Host+regionsEndpoint, nil)
