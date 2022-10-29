@@ -8,14 +8,16 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
-	"net/url"
+	"time"
 
 	"github.com/arvancloud/cli/pkg/api"
 	"github.com/arvancloud/cli/pkg/config"
 	"github.com/arvancloud/cli/pkg/utl"
+	"github.com/gosuri/uilive"
 	"github.com/olekukonko/tablewriter"
 	"k8s.io/client-go/rest"
 
@@ -30,6 +32,16 @@ const (
 	yellowColor       = "\033[33m"
 	resetColor        = "\033[0m"
 	bamdad            = "ba1"
+	interval          = 2
+)
+
+type State string
+
+const (
+	Queued    State = "Queued"
+	Doing           = "Doing"
+	Completed       = "Completed"
+	Failed          = "Failed"
 )
 
 type Request struct {
@@ -53,6 +65,29 @@ type ZoneInfo struct {
 	Services []Service `json:"services"`
 	Routes   []Route   `json:"routes"`
 	Gateway  string    `json:"gateway"`
+}
+
+type StepData struct {
+	Time     time.Time
+	Message  string
+	Percent  int
+	Response Response
+}
+
+type Step struct {
+	Order int
+	Step  string
+	Title string
+	State string
+	Data  StepData
+}
+
+type ProgressResponse struct {
+	State       State
+	Source      string
+	Destination string
+	Namespace   string
+	Steps       []Step
 }
 
 type Response struct {
@@ -216,18 +251,66 @@ func (v confirmationValidator) confirmationValidate(input string) (bool, error) 
 
 // migrate sends migration request and displays response.
 func migrate(request Request) error {
-	response, err := httpPost(migrationEndpoint, request)
-	if err != nil {
-		failureOutput()
+	postResponse, err := httpPost(migrationEndpoint, request)
+	if err != nil || postResponse.StatusCode != http.StatusCreated {
+		failureOutput(fmt.Sprint(postResponse.StatusCode))
 		return err
 	}
-	successOutput(response)
-	
+
+	writer := uilive.New()
+	writer.Start()
+	defer writer.Stop()
+
+	stopChannel := make(chan bool, 1)
+	doEvery(interval*time.Second, stopChannel, func() {
+		response, _ := httpGet(migrationEndpoint)
+
+		sprintResponse(*response, writer)
+
+		if response.State == Completed {
+			close(stopChannel)
+
+			successOutput(&response.Steps[len(response.Steps)-1].Data.Response)
+		}
+
+		if response.State == Failed {
+			failureOutput(response.Steps[len(response.Steps)-1].Data.Message)
+		}
+	})
+
+	return nil
+}
+
+// doEvery runs given function in periods of 'd' and stops using stopChannel.
+func doEvery(d time.Duration, stopChannel chan bool, f func()) {
+	ticker := time.NewTicker(d)
+
+	for {
+		select {
+		case <-ticker.C:
+			f()
+		case <-stopChannel:
+			ticker.Stop()
+			return
+		}
+	}
+}
+
+// sprintResponse displays steps of migration.
+func sprintResponse(response ProgressResponse, w *uilive.Writer) error {
+	responseStr := fmt.Sprintf("Migrating namespace \"%s\" from \"%s\" to \"%s\" started\n", response.Namespace, response.Source, response.Destination)
+	for _, s := range response.Steps {
+		responseStr += fmt.Sprintf("\t%s... %s %s\n", s.Title, s.State, s.Data.Message)
+	}
+
+	fmt.Fprintf(w, "%s", responseStr)
+	time.Sleep(time.Second * 1)
+
 	return nil
 }
 
 // httpPost sends POST request to inserted url.
-func httpPost(endpoint string, payload interface{}) (*Response, error) {
+func httpPost(endpoint string, payload interface{}) (*http.Response, error) {
 	requestBody, err := json.Marshal(payload)
 	if err != nil {
 		return nil, err
@@ -238,7 +321,38 @@ func httpPost(endpoint string, payload interface{}) (*Response, error) {
 		return nil, fmt.Errorf("invalid config")
 	}
 
-	httpReq, err := http.NewRequest(http.MethodPost, arvanURL.Scheme + "://" + arvanURL.Host+endpoint, bytes.NewBuffer(requestBody))
+	httpReq, err := http.NewRequest(http.MethodPost, arvanURL.Scheme+"://"+arvanURL.Host+endpoint, bytes.NewBuffer(requestBody))
+	if err != nil {
+		return nil, err
+	}
+	apikey := arvanConfig.GetApiKey()
+	if apikey != "" {
+		httpReq.Header.Add("Authorization", apikey)
+	}
+
+	httpReq.Header.Add("accept", "application/json")
+	httpReq.Header.Add("User-Agent", rest.DefaultKubernetesUserAgent())
+	httpResp, err := http.DefaultClient.Do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+
+	if httpResp.StatusCode != http.StatusOK {
+		return nil, errors.New("server error. try again later")
+	}
+
+	return httpResp, nil
+}
+
+// httpGet sends GET request to inserted url.
+func httpGet(endpoint string) (*ProgressResponse, error) {
+	arvanConfig := config.GetConfigInfo()
+	arvanURL, err := url.Parse(arvanConfig.GetServer())
+	if err != nil {
+		return nil, fmt.Errorf("invalid config")
+	}
+
+	httpReq, err := http.NewRequest(http.MethodGet, arvanURL.Scheme+"://"+arvanURL.Host+endpoint, bytes.NewBuffer([]byte{}))
 	if err != nil {
 		return nil, err
 	}
@@ -266,7 +380,7 @@ func httpPost(endpoint string, payload interface{}) (*Response, error) {
 	}
 
 	// parse response
-	var response Response
+	var response ProgressResponse
 	err = json.Unmarshal(responseBody, &response)
 	if err != nil {
 		return nil, err
@@ -275,8 +389,8 @@ func httpPost(endpoint string, payload interface{}) (*Response, error) {
 }
 
 // failureOutput displays failure output.
-func failureOutput() {
-	fmt.Println("failed to migrate")
+func failureOutput(message string) {
+	fmt.Println("failed to migrate", message)
 }
 
 // successOutput displays success output.
