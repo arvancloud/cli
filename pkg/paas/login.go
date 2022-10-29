@@ -83,7 +83,7 @@ func NewCmdSwitchRegion(in io.Reader, out, errout io.Writer) *cobra.Command {
 
 			region, err := getSelectedRegion(in, explainOut)
 			utl.CheckErr(err)
-			
+
 			_, err = config.LoadConfigFile()
 			if err != nil {
 				log.Println(err)
@@ -189,18 +189,17 @@ func (r regionValidator) validate(input string) (bool, error) {
 
 func sprintRegions(activeZones, inactiveRegions []config.Zone) string {
 	result := ""
-	var activeZoneIndex int 
+	var activeZoneIndex int
 	for i := 0; i < len(activeZones); i++ {
 		if activeZones[i].Default {
 			activeZoneIndex++
-			log.Println(activeZones[i].Release)
 
 			if activeZones[i].Release == "STABLE" {
 				result += fmt.Sprintf("  [%d] %s-%s\n", activeZoneIndex, activeZones[i].RegionName, activeZones[i].Name)
 			} else {
 				result += fmt.Sprintf("  [%d] %s-%s(%s)\n", activeZoneIndex, activeZones[i].RegionName, activeZones[i].Name, activeZones[i].Release)
 			}
-			
+
 		}
 	}
 	for i := 0; i < len(activeZones); i++ {
@@ -211,7 +210,8 @@ func sprintRegions(activeZones, inactiveRegions []config.Zone) string {
 			} else {
 				result += fmt.Sprintf("  [%d] %s-%s(%s)\n", activeZoneIndex, activeZones[i].RegionName, activeZones[i].Name, activeZones[i].Release)
 			}
-		}	}
+		}
+	}
 	for i := 0; i < len(inactiveRegions); i++ {
 		result += fmt.Sprintf("  [-] %s-%s (inactive)\n", inactiveRegions[i].RegionName, inactiveRegions[i].Name)
 	}

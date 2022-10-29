@@ -2,20 +2,19 @@ package cli
 
 import (
 	"fmt"
-	"github.com/arvancloud/cli/pkg/api"
-	"github.com/arvancloud/cli/pkg/utl"
-	"github.com/inconshreveable/go-update"
 	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
 
-	"github.com/spf13/cobra"
-
-	"github.com/openshift/oc/pkg/helpers/term"
-
+	"github.com/arvancloud/cli/pkg/api"
 	"github.com/arvancloud/cli/pkg/config"
 	"github.com/arvancloud/cli/pkg/paas"
+	"github.com/arvancloud/cli/pkg/utl"
+	"github.com/inconshreveable/go-update"
+
+	"github.com/openshift/oc/pkg/helpers/term"
+	"github.com/spf13/cobra"
 )
 
 var (
@@ -60,7 +59,7 @@ func NewCommandCLI() *cobra.Command {
 	cmd.AddCommand(loginCommand)
 
 	paasCommand := paas.NewCmdPaas()
-	cmd.AddCommand(paasCommand)	
+	cmd.AddCommand(paasCommand)
 
 	cmd.AddCommand(updateCmd())
 	return cmd

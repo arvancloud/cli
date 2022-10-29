@@ -30,7 +30,6 @@ const (
 	projectListPath    = "apis/project.openshift.io/v1/projects"
 )
 
-
 // NewCmdPaas return new cobra cli for paas
 func NewCmdPaas() *cobra.Command {
 
@@ -39,6 +38,9 @@ func NewCmdPaas() *cobra.Command {
 	in, out, errout := os.Stdin, os.Stdout, os.Stderr
 
 	paasCommand.AddCommand(NewCmdSwitchRegion(in, out, errout))
+
+	migrateCommand := NewCmdMigrate(in, out, errout)
+	paasCommand.AddCommand(migrateCommand)
 
 	paasCommand.PersistentPreRun = func(cmd *cobra.Command, args []string) {
 		err := prepareCommand(cmd)
@@ -263,7 +265,7 @@ func getArvanAuthorization() string {
 func getArvanPaasServerBase() string {
 	arvanConfig := config.GetConfigInfo()
 	arvanServer := arvanConfig.GetServer()
-	return arvanServer +  paasUrlPostfix
+	return arvanServer + paasUrlPostfix
 }
 
 func syncKubeConfig(path, username string, projects []string) error {
