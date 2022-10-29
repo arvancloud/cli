@@ -58,7 +58,6 @@ type ZoneInfo struct {
 type Response struct {
 	Source      ZoneInfo `json:"source"`
 	Destination ZoneInfo `json:"destination"`
-	Status      int      `json:"status"`
 }
 
 // NewCmdMigrate returns new cobra commad enables user to migrate namespaces to another region on arvan servers.
@@ -219,15 +218,11 @@ func (v confirmationValidator) confirmationValidate(input string) (bool, error) 
 func migrate(request Request) error {
 	response, err := httpPost(migrationEndpoint, request)
 	if err != nil {
+		failureOutput()
 		return err
 	}
-
-	if response.Status == http.StatusOK {
-		successOutput(response)
-	}
-
-	failureOutput()
-
+	successOutput(response)
+	
 	return nil
 }
 
@@ -257,10 +252,6 @@ func httpPost(endpoint string, payload interface{}) (*Response, error) {
 	httpResp, err := http.DefaultClient.Do(httpReq)
 	if err != nil {
 		return nil, err
-	}
-
-	if httpResp.StatusCode == http.StatusNoContent {
-		return nil, nil
 	}
 
 	if httpResp.StatusCode != http.StatusOK {
