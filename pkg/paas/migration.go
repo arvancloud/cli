@@ -303,9 +303,10 @@ func doEvery(d time.Duration, stopChannel chan bool, f func()) {
 	ticker := time.NewTicker(d)
 
 	for {
+		f()
 		select {
 		case <-ticker.C:
-			f()
+			continue
 		case <-stopChannel:
 			ticker.Stop()
 			return
