@@ -8,19 +8,22 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
-	"net/url"
+	"text/tabwriter"
+	"time"
 
 	"github.com/arvancloud/cli/pkg/api"
 	"github.com/arvancloud/cli/pkg/config"
 	"github.com/arvancloud/cli/pkg/utl"
-	"github.com/olekukonko/tablewriter"
-	"k8s.io/client-go/rest"
 
+	"github.com/gosuri/uilive"
+	"github.com/olekukonko/tablewriter"
 	"github.com/openshift/oc/pkg/helpers/term"
 	"github.com/spf13/cobra"
+	"k8s.io/client-go/rest"
 )
 
 const (
@@ -30,6 +33,16 @@ const (
 	yellowColor       = "\033[33m"
 	resetColor        = "\033[0m"
 	bamdad            = "ba1"
+	interval          = 10
+)
+
+type State string
+
+const (
+	Pending   State = "Pending"
+	Doing     State = "Doing"
+	Completed State = "Completed"
+	Failed    State = "Failed"
 )
 
 type Request struct {
@@ -55,6 +68,29 @@ type ZoneInfo struct {
 	Gateway  string    `json:"gateway"`
 }
 
+type StepData struct {
+	Time     time.Time
+	Message  string
+	Percent  int
+	Response Response
+}
+
+type Step struct {
+	Order int
+	Step  string
+	Title string
+	State string
+	Data  StepData
+}
+
+type ProgressResponse struct {
+	State       State
+	Source      string
+	Destination string
+	Namespace   string
+	Steps       []Step
+}
+
 type Response struct {
 	Source      ZoneInfo `json:"source"`
 	Destination ZoneInfo `json:"destination"`
@@ -70,7 +106,11 @@ func NewCmdMigrate(in io.Reader, out, errout io.Writer) *cobra.Command {
 			explainOut := term.NewResponsiveWriter(out)
 			c.SetOutput(explainOut)
 
-			project, _ := getSelectedProject(in, explainOut)
+			project, err := getSelectedProject(in, explainOut)
+			if err != nil {
+				failureOutput(err.Error())
+				return
+			}
 
 			currentRegionName := getCurrentRegion()
 
@@ -216,18 +256,79 @@ func (v confirmationValidator) confirmationValidate(input string) (bool, error) 
 
 // migrate sends migration request and displays response.
 func migrate(request Request) error {
-	response, err := httpPost(migrationEndpoint, request)
+	postResponse, err := httpPost(migrationEndpoint, request)
 	if err != nil {
-		failureOutput()
+		failureOutput(err.Error())
 		return err
 	}
-	successOutput(response)
-	
+
+	if postResponse.StatusCode != http.StatusCreated {
+		failureOutput(fmt.Sprint(postResponse.StatusCode))
+		return errors.New(fmt.Sprint(postResponse.StatusCode))
+	}
+
+	// init writer to update lines
+	uiliveWriter := uilive.New()
+	uiliveWriter.Start()
+
+	// init writer to display lines in column
+	tabWriter := new(tabwriter.Writer)
+	tabWriter.Init(uiliveWriter, 0, 8, 0, '\t', 0)
+
+	stopChannel := make(chan bool, 1)
+
+	doEvery(interval*time.Second, stopChannel, func() {
+		response, _ := httpGet(migrationEndpoint)
+
+		sprintResponse(*response, tabWriter)
+
+		if response.State == Completed {
+			close(stopChannel)
+			tabWriter.Flush()
+			uiliveWriter.Stop()
+
+			successOutput(&response.Steps[len(response.Steps)-1].Data.Response)
+		}
+
+		if response.State == Failed {
+			failureOutput(response.Steps[len(response.Steps)-1].Data.Message)
+		}
+	})
+
+	return nil
+}
+
+// doEvery runs given function in periods of 'd' and stops using stopChannel.
+func doEvery(d time.Duration, stopChannel chan bool, f func()) {
+	ticker := time.NewTicker(d)
+
+	for {
+		f()
+		select {
+		case <-ticker.C:
+			continue
+		case <-stopChannel:
+			ticker.Stop()
+			return
+		}
+	}
+}
+
+// sprintResponse displays steps of migration.
+func sprintResponse(response ProgressResponse, w io.Writer) error {
+	responseStr := fmt.Sprintln("")
+	for _, s := range response.Steps {
+		responseStr += fmt.Sprintf("\t%s...\t\t%s\t%s\n", s.Title, s.State, s.Data.Message)
+	}
+
+	fmt.Fprintf(w, "%s", responseStr)
+	time.Sleep(time.Millisecond * 100)
+
 	return nil
 }
 
 // httpPost sends POST request to inserted url.
-func httpPost(endpoint string, payload interface{}) (*Response, error) {
+func httpPost(endpoint string, payload interface{}) (*http.Response, error) {
 	requestBody, err := json.Marshal(payload)
 	if err != nil {
 		return nil, err
@@ -238,7 +339,38 @@ func httpPost(endpoint string, payload interface{}) (*Response, error) {
 		return nil, fmt.Errorf("invalid config")
 	}
 
-	httpReq, err := http.NewRequest(http.MethodPost, arvanURL.Scheme + "://" + arvanURL.Host+endpoint, bytes.NewBuffer(requestBody))
+	httpReq, err := http.NewRequest(http.MethodPost, arvanURL.Scheme+"://"+arvanURL.Host+endpoint, bytes.NewBuffer(requestBody))
+	if err != nil {
+		return nil, err
+	}
+	apikey := arvanConfig.GetApiKey()
+	if apikey != "" {
+		httpReq.Header.Add("Authorization", apikey)
+	}
+
+	httpReq.Header.Add("accept", "application/json")
+	httpReq.Header.Add("User-Agent", rest.DefaultKubernetesUserAgent())
+	httpResp, err := http.DefaultClient.Do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+
+	if httpResp.StatusCode != http.StatusOK {
+		return nil, errors.New("server error. try again later")
+	}
+
+	return httpResp, nil
+}
+
+// httpGet sends GET request to inserted url.
+func httpGet(endpoint string) (*ProgressResponse, error) {
+	arvanConfig := config.GetConfigInfo()
+	arvanURL, err := url.Parse(arvanConfig.GetServer())
+	if err != nil {
+		return nil, fmt.Errorf("invalid config")
+	}
+
+	httpReq, err := http.NewRequest(http.MethodGet, arvanURL.Scheme+"://"+arvanURL.Host+endpoint, bytes.NewBuffer([]byte{}))
 	if err != nil {
 		return nil, err
 	}
@@ -266,7 +398,7 @@ func httpPost(endpoint string, payload interface{}) (*Response, error) {
 	}
 
 	// parse response
-	var response Response
+	var response ProgressResponse
 	err = json.Unmarshal(responseBody, &response)
 	if err != nil {
 		return nil, err
@@ -275,8 +407,8 @@ func httpPost(endpoint string, payload interface{}) (*Response, error) {
 }
 
 // failureOutput displays failure output.
-func failureOutput() {
-	fmt.Println("failed to migrate")
+func failureOutput(message string) {
+	fmt.Println("failed:", message)
 }
 
 // successOutput displays success output.
