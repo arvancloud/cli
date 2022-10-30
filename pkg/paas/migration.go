@@ -40,9 +40,9 @@ type State string
 
 const (
 	Pending   State = "Pending"
-	Doing           = "Doing"
-	Completed       = "Completed"
-	Failed          = "Failed"
+	Doing     State = "Doing"
+	Completed State = "Completed"
+	Failed    State = "Failed"
 )
 
 type Request struct {
