@@ -33,7 +33,7 @@ const (
 	yellowColor       = "\033[33m"
 	resetColor        = "\033[0m"
 	bamdad            = "ba1"
-	interval          = 2
+	interval          = 10
 )
 
 type State string
