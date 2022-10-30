@@ -12,17 +12,18 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"text/tabwriter"
 	"time"
 
 	"github.com/arvancloud/cli/pkg/api"
 	"github.com/arvancloud/cli/pkg/config"
 	"github.com/arvancloud/cli/pkg/utl"
+
 	"github.com/gosuri/uilive"
 	"github.com/olekukonko/tablewriter"
-	"k8s.io/client-go/rest"
-
 	"github.com/openshift/oc/pkg/helpers/term"
 	"github.com/spf13/cobra"
+	"k8s.io/client-go/rest"
 )
 
 const (
@@ -38,7 +39,7 @@ const (
 type State string
 
 const (
-	Queued    State = "Queued"
+	Pending   State = "Pending"
 	Doing           = "Doing"
 	Completed       = "Completed"
 	Failed          = "Failed"
@@ -252,23 +253,34 @@ func (v confirmationValidator) confirmationValidate(input string) (bool, error) 
 // migrate sends migration request and displays response.
 func migrate(request Request) error {
 	postResponse, err := httpPost(migrationEndpoint, request)
-	if err != nil || postResponse.StatusCode != http.StatusCreated {
-		failureOutput(fmt.Sprint(postResponse.StatusCode))
+	if err != nil {
+		failureOutput(err.Error())
 		return err
 	}
 
-	writer := uilive.New()
-	writer.Start()
-	defer writer.Stop()
+	if postResponse.StatusCode != http.StatusCreated {
+		failureOutput(fmt.Sprint(postResponse.StatusCode))
+	}
+
+	// init writer to update lines
+	uiliveWriter := uilive.New()
+	uiliveWriter.Start()
+
+	// init writer to display lines in column
+	tabWriter := new(tabwriter.Writer)
+	tabWriter.Init(uiliveWriter, 0, 8, 0, '\t', 0)
 
 	stopChannel := make(chan bool, 1)
+
 	doEvery(interval*time.Second, stopChannel, func() {
 		response, _ := httpGet(migrationEndpoint)
 
-		sprintResponse(*response, writer)
+		sprintResponse(*response, tabWriter)
 
 		if response.State == Completed {
 			close(stopChannel)
+			tabWriter.Flush()
+			uiliveWriter.Stop()
 
 			successOutput(&response.Steps[len(response.Steps)-1].Data.Response)
 		}
@@ -297,14 +309,14 @@ func doEvery(d time.Duration, stopChannel chan bool, f func()) {
 }
 
 // sprintResponse displays steps of migration.
-func sprintResponse(response ProgressResponse, w *uilive.Writer) error {
-	responseStr := fmt.Sprintf("Migrating namespace \"%s\" from \"%s\" to \"%s\" started\n", response.Namespace, response.Source, response.Destination)
+func sprintResponse(response ProgressResponse, w io.Writer) error {
+	responseStr := fmt.Sprintln("")
 	for _, s := range response.Steps {
-		responseStr += fmt.Sprintf("\t%s... %s %s\n", s.Title, s.State, s.Data.Message)
+		responseStr += fmt.Sprintf("\t%s...\t\t%s\t%s\n", s.Title, s.State, s.Data.Message)
 	}
 
 	fmt.Fprintf(w, "%s", responseStr)
-	time.Sleep(time.Second * 1)
+	time.Sleep(time.Millisecond * 100)
 
 	return nil
 }
