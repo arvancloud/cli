@@ -106,7 +106,11 @@ func NewCmdMigrate(in io.Reader, out, errout io.Writer) *cobra.Command {
 			explainOut := term.NewResponsiveWriter(out)
 			c.SetOutput(explainOut)
 
-			project, _ := getSelectedProject(in, explainOut)
+			project, err := getSelectedProject(in, explainOut)
+			if err != nil {
+				failureOutput(err.Error())
+				return
+			}
 
 			currentRegionName := getCurrentRegion()
 
@@ -260,6 +264,7 @@ func migrate(request Request) error {
 
 	if postResponse.StatusCode != http.StatusCreated {
 		failureOutput(fmt.Sprint(postResponse.StatusCode))
+		return errors.New(fmt.Sprint(postResponse.StatusCode))
 	}
 
 	// init writer to update lines
@@ -402,7 +407,7 @@ func httpGet(endpoint string) (*ProgressResponse, error) {
 
 // failureOutput displays failure output.
 func failureOutput(message string) {
-	fmt.Println("failed to migrate", message)
+	fmt.Println("failed:", message)
 }
 
 // successOutput displays success output.
