@@ -88,6 +88,7 @@ type ProgressResponse struct {
 	Destination string `json:"destination"`
 	Namespace   string `json:"namespace"`
 	Message     string `json:"message"`
+	StatusCode  int    `json:"StatusCode"`
 	Steps       []Step `json:"steps"`
 }
 
@@ -101,39 +102,68 @@ func NewCmdMigrate(in io.Reader, out, errout io.Writer) *cobra.Command {
 			explainOut := term.NewResponsiveWriter(out)
 			c.SetOutput(explainOut)
 
-			project, err := getSelectedProject(in, explainOut)
+			currentRegionName := getCurrentRegion()
+
+			request := Request{
+				Source: currentRegionName,
+			}
+
+			response, err := httpGet(fmt.Sprintf(migrationEndpoint, request.Source))
 			if err != nil {
 				failureOutput(err.Error())
 				return
 			}
 
-			currentRegionName := getCurrentRegion()
+			if response.StatusCode == http.StatusBadRequest {
+				failureOutput(response.Message)
 
-			if currentRegionName == bamdad {
-				log.Printf("migration from region %s is not possible now\nplease first switch your region using command:\n\n \tarvan paas region\n\n", currentRegionName)
 				return
 			}
 
-			destinationRegion, err := getZoneByName(bamdad)
-			utl.CheckErr(err)
-
-			if currentRegionName == getRegionFromEndpoint(destinationRegion.Endpoint) {
-				log.Printf("can not migrate to this region")
-				return
+			if response.StatusCode == http.StatusOK {
+				if response.State == Completed || response.State == Failed {
+					migrate(request)
+					reMigrationConfirmed := reMigrationConfirm(in, explainOut)
+					if !reMigrationConfirmed {
+						return
+					}
+				}
 			}
 
-			confirmed := migrationConfirm(project, getRegionFromEndpoint(destinationRegion.Endpoint), in, explainOut)
-			if !confirmed {
-				return
+			if response.StatusCode == http.StatusNotFound || response.StatusCode == http.StatusOK {
+				project, err := getSelectedProject(in, explainOut)
+				if err != nil {
+					failureOutput(err.Error())
+
+					return
+				}
+
+				destinationRegion, err := getZoneByName(bamdad)
+				utl.CheckErr(err)
+
+				if currentRegionName == getRegionFromEndpoint(destinationRegion.Endpoint) {
+					log.Printf("can not migrate to this region")
+					return
+				}
+
+				confirmed := migrationConfirm(project, getRegionFromEndpoint(destinationRegion.Endpoint), in, explainOut)
+				if !confirmed {
+					return
+				}
+
+				request.Namespace = project
+				request.Destination = fmt.Sprintf("%s-%s", destinationRegion.RegionName, destinationRegion.Name)
+
 			}
 
-			requset := Request{
-				Namespace:   project,
-				Source:      currentRegionName,
-				Destination: fmt.Sprintf("%s-%s", destinationRegion.RegionName, destinationRegion.Name),
+			if response.StatusCode != http.StatusFound {
+				err := httpPost(fmt.Sprintf(migrationEndpoint, request.Source), request)
+				if err != nil {
+					failureOutput(err.Error())
+				}
 			}
 
-			err = migrate(requset)
+			err = migrate(request)
 			if err != nil {
 				log.Println(err)
 			}
@@ -141,6 +171,22 @@ func NewCmdMigrate(in io.Reader, out, errout io.Writer) *cobra.Command {
 	}
 
 	return cmd
+}
+
+func reMigrationConfirm(in io.Reader, writer io.Writer) bool {
+	inputExplain := "Do you want to run a new migration?[y/N]: "
+
+	defaultVal := "N"
+
+	value := utl.ReadInput(inputExplain, defaultVal, writer, in, confirmationValidate)
+	return value == "y"
+}
+
+func confirmationValidate(input string) (bool, error) {
+	if input != "y" && input != "N" {
+		return false, fmt.Errorf("enter a valid answer 'y' for \"yes\" or 'N' for \"no\"")
+	}
+	return true, nil
 }
 
 // getSelectedProject gets intending namespace to migrate.
@@ -227,7 +273,7 @@ func migrationConfirm(project, region string, in io.Reader, writer io.Writer) bo
 	if err != nil {
 		return false
 	}
-	inputExplain := fmt.Sprintf(yellowColor+"\nWARNING: This will STOP your applications during migration process.\nYour data would still be safe and available in source region."+resetColor+"\n\nPlease enter project's name [%s] to proceed: ", project)
+	inputExplain := fmt.Sprintf(yellowColor+"\nWARNING: This will STOP your applications during migration process.\nYour data would still be safe and available in source region.\nMigration is running in the background and may take a while.\nYou can optionally detach(Ctrl+C) for now and\ncontinue monitoring the process after using 'arvan paas migrate'."+resetColor+"\n\nPlease enter project's name [%s] to proceed: ", project)
 
 	defaultVal := ""
 
@@ -251,7 +297,6 @@ func (v confirmationValidator) confirmationValidate(input string) (bool, error) 
 
 // migrate sends migration request and displays response.
 func migrate(request Request) error {
-	fmt.Println("Migration is running in the background and may take a while.\nYou can optionally detach(Ctrl+C) for now and\ncontinue monitoring the process after using 'arvan paas migrate'.")
 	err := httpPost(fmt.Sprintf(migrationEndpoint, request.Source), request)
 	if err != nil {
 		failureOutput(err.Error())
@@ -351,11 +396,14 @@ func httpPost(endpoint string, payload interface{}) error {
 		return err
 	}
 
+	// read body
+	defer httpResp.Body.Close()
 	responseBody, err := io.ReadAll(httpResp.Body)
 	if err != nil {
-		log.Fatalln(err)
+		return err
 	}
 
+	// parse response
 	var response ProgressResponse
 	err = json.Unmarshal(responseBody, &response)
 	if err != nil {
@@ -393,10 +441,6 @@ func httpGet(endpoint string) (*ProgressResponse, error) {
 		return nil, err
 	}
 
-	if httpResp.StatusCode != http.StatusOK {
-		return nil, errors.New("server error. try again later")
-	}
-
 	// read body
 	defer httpResp.Body.Close()
 	responseBody, err := io.ReadAll(httpResp.Body)
@@ -410,6 +454,9 @@ func httpGet(endpoint string) (*ProgressResponse, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	response.StatusCode = httpResp.StatusCode
+
 	return &response, nil
 }
 
@@ -420,6 +467,8 @@ func failureOutput(message string) {
 
 // successOutput displays success output.
 func successOutput(data StepData) {
+	fmt.Println("\nYour namespaces successfully migrated!")
+
 	if len(data.Source.Services) > 0 {
 		ipTable := tablewriter.NewWriter(os.Stdout)
 		ipTable.SetHeader([]string{"Old IPs", "New IPs"})
