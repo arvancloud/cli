@@ -276,14 +276,14 @@ func migrate(request Request) error {
 		response, err := httpGet(fmt.Sprintf(migrationEndpoint, request.Source))
 		if err != nil {
 			failureOutput(err.Error())
-			close(stopChannel)
+			stopChannel <- true
 			return
 		}
 
 		sprintResponse(*response, tabWriter)
 
 		if response.State == Completed {
-			close(stopChannel)
+			stopChannel <- true
 			tabWriter.Flush()
 			uiliveWriter.Stop()
 
