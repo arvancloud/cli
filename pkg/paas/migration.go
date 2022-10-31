@@ -56,7 +56,7 @@ type Service struct {
 	IP   string `json:"ip"`
 }
 
-type Route struct {
+type Domain struct {
 	Name   string `json:"name"`
 	Host   string `json:"host"`
 	IsFree bool   `json:"is_free"`
@@ -64,7 +64,7 @@ type Route struct {
 
 type ZoneInfo struct {
 	Services []Service `json:"services"`
-	Routes   []Route   `json:"routes"`
+	Domains  []Domain  `json:"domains"`
 	Gateway  string    `json:"gateway"`
 }
 
@@ -431,46 +431,46 @@ func successOutput(data StepData) {
 		ipTable.Render()
 	}
 
-	freeSourceRoutes := make([]Route, 0)
-	freeDestinationRoutes := make([]Route, 0)
-	nonfreeSourceRoutes := make([]Route, 0)
-	nonfreeDestinationRoutes := make([]Route, 0)
+	freeSourceDomains := make([]Domain, 0)
+	freeDestinationDomains := make([]Domain, 0)
+	nonfreeSourceDomains := make([]Domain, 0)
+	nonfreeDestinationDomains := make([]Domain, 0)
 
-	for i := 0; i < len(data.Source.Routes); i++ {
-		if data.Source.Routes[i].IsFree {
-			freeSourceRoutes = append(freeSourceRoutes, data.Source.Routes[i])
-			freeDestinationRoutes = append(freeDestinationRoutes, data.Destination.Routes[i])
+	for i := 0; i < len(data.Source.Domains); i++ {
+		if data.Source.Domains[i].IsFree {
+			freeSourceDomains = append(freeSourceDomains, data.Source.Domains[i])
+			freeDestinationDomains = append(freeDestinationDomains, data.Destination.Domains[i])
 		} else {
-			nonfreeSourceRoutes = append(nonfreeSourceRoutes, data.Source.Routes[i])
-			nonfreeDestinationRoutes = append(nonfreeDestinationRoutes, data.Destination.Routes[i])
+			nonfreeSourceDomains = append(nonfreeSourceDomains, data.Source.Domains[i])
+			nonfreeDestinationDomains = append(nonfreeDestinationDomains, data.Destination.Domains[i])
 		}
 	}
 
-	if len(freeSourceRoutes) > 0 {
-		fmt.Println("Your free routes changed successfully:")
+	if len(freeSourceDomains) > 0 {
+		fmt.Println("Your free domains changed successfully:")
 
-		freeRouteTable := tablewriter.NewWriter(os.Stdout)
-		freeRouteTable.SetHeader([]string{"old free routes", "new free routes"})
+		freeDomainTable := tablewriter.NewWriter(os.Stdout)
+		freeDomainTable.SetHeader([]string{"old free domains", "new free domains"})
 
-		for i := 0; i < len(freeSourceRoutes); i++ {
-			freeRouteTable.Append([]string{redColor + freeSourceRoutes[i].Host + resetColor, greenColor + freeDestinationRoutes[i].Host + resetColor})
+		for i := 0; i < len(freeSourceDomains); i++ {
+			freeDomainTable.Append([]string{redColor + freeSourceDomains[i].Host + resetColor, greenColor + freeDestinationDomains[i].Host + resetColor})
 		}
 
-		freeRouteTable.Render()
+		freeDomainTable.Render()
 	}
 
-	if len(nonfreeSourceRoutes) > 0 {
-		nonFreeRouteTable := tablewriter.NewWriter(os.Stdout)
-		nonFreeRouteTable.SetHeader([]string{"non-free routes"})
+	if len(nonfreeSourceDomains) > 0 {
+		nonFreeDomainTable := tablewriter.NewWriter(os.Stdout)
+		nonFreeDomainTable.SetHeader([]string{"non-free domains"})
 
-		for i := 0; i < len(nonfreeSourceRoutes); i++ {
-			nonFreeRouteTable.Append([]string{yellowColor + nonfreeDestinationRoutes[i].Host + resetColor})
+		for i := 0; i < len(nonfreeSourceDomains); i++ {
+			nonFreeDomainTable.Append([]string{yellowColor + nonfreeDestinationDomains[i].Host + resetColor})
 		}
 
-		nonFreeRouteTable.Render()
+		nonFreeDomainTable.Render()
 	}
 
-	if len(freeSourceRoutes) > 0 {
+	if len(freeSourceDomains) > 0 {
 		gatewayTable := tablewriter.NewWriter(os.Stdout)
 		gatewayTable.SetHeader([]string{"old gateway", "new gateway"})
 
