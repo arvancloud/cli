@@ -160,12 +160,13 @@ func NewCmdMigrate(in io.Reader, out, errout io.Writer) *cobra.Command {
 				err := httpPost(fmt.Sprintf(migrationEndpoint, request.Source), request)
 				if err != nil {
 					failureOutput(err.Error())
+					return
 				}
 			}
 
 			err = migrate(request)
 			if err != nil {
-				log.Println(err)
+				failureOutput(err.Error())
 			}
 		},
 	}
