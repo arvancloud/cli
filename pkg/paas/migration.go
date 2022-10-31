@@ -413,16 +413,16 @@ func failureOutput(message string) {
 
 // successOutput displays success output.
 func successOutput(data StepData) {
-	fmt.Println("\nYour IPs changed successfully")
+	if len(data.Source.Services) > 0 {
+		ipTable := tablewriter.NewWriter(os.Stdout)
+		ipTable.SetHeader([]string{"Old IPs", "New IPs"})
 
-	ipTable := tablewriter.NewWriter(os.Stdout)
-	ipTable.SetHeader([]string{"Old IPs", "New IPs"})
+		for i := 0; i < len(data.Source.Services); i++ {
+			ipTable.Append([]string{redColor + data.Source.Services[i].IP + resetColor, greenColor + data.Destination.Services[i].IP + resetColor})
+		}
 
-	for i := 0; i < len(data.Source.Services); i++ {
-		ipTable.Append([]string{redColor + data.Source.Services[i].IP + resetColor, greenColor + data.Destination.Services[i].IP + resetColor})
+		ipTable.Render()
 	}
-
-	ipTable.Render()
 
 	freeSourceRoutes := make([]Route, 0)
 	freeDestinationRoutes := make([]Route, 0)
@@ -463,12 +463,14 @@ func successOutput(data StepData) {
 		nonFreeRouteTable.Render()
 	}
 
-	gatewayTable := tablewriter.NewWriter(os.Stdout)
-	gatewayTable.SetHeader([]string{"old gateway", "new gateway"})
+	if len(freeSourceRoutes) > 0 {
+		gatewayTable := tablewriter.NewWriter(os.Stdout)
+		gatewayTable.SetHeader([]string{"old gateway", "new gateway"})
 
-	fmt.Println("For non-free domains above, please change your gateway in your DNS provider as bellow:")
-	gatewayTable.Append([]string{redColor + data.Source.Gateway + resetColor, greenColor + data.Destination.Gateway + resetColor})
-	gatewayTable.Render()
+		fmt.Println("For non-free domains above, please change your gateway in your DNS provider as bellow:")
+		gatewayTable.Append([]string{redColor + data.Source.Gateway + resetColor, greenColor + data.Destination.Gateway + resetColor})
+		gatewayTable.Render()
+	}
 }
 
 // getZoneByName gets zone from list of active zones giving it's name.
