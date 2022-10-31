@@ -228,7 +228,7 @@ func migrationConfirm(project, region string, in io.Reader, writer io.Writer) bo
 	if err != nil {
 		return false
 	}
-	inputExplain := fmt.Sprintf(yellowColor+"\nWARNING: This will STOP your applications during migration process."+resetColor+"\n\nPlease enter project's name [%s] to proceed: ", project)
+	inputExplain := fmt.Sprintf(yellowColor+"\nWARNING: This will STOP your applications during migration process.\nYour data would still be safe and available in destination region."+resetColor+"\n\nPlease enter project's name [%s] to proceed: ", project)
 
 	defaultVal := ""
 
