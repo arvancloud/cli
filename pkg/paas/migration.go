@@ -87,11 +87,8 @@ type ProgressResponse struct {
 	Source      string `json:"source"`
 	Destination string `json:"destination"`
 	Namespace   string `json:"namespace"`
+	Message     string `json:"message"`
 	Steps       []Step `json:"steps"`
-}
-
-type httpMessage struct {
-	Message string `json:"message"`
 }
 
 // NewCmdMigrate returns new cobra commad enables user to migrate namespaces to another region on arvan servers.
@@ -255,16 +252,12 @@ func (v confirmationValidator) confirmationValidate(input string) (bool, error) 
 // migrate sends migration request and displays response.
 func migrate(request Request) error {
 	fmt.Println("Migration is running in the background and may take a while.\nYou can optionally detach(Ctrl+C) for now and\ncontinue monitoring the process after using 'arvan paas migrate'.")
-	postResponse, err := httpPost(fmt.Sprintf(migrationEndpoint, request.Source), request)
+	err := httpPost(fmt.Sprintf(migrationEndpoint, request.Source), request)
 	if err != nil {
 		failureOutput(err.Error())
 		return err
 	}
 
-	if postResponse.StatusCode != http.StatusOK && postResponse.StatusCode != http.StatusFound {
-		failureOutput(fmt.Sprint(postResponse.StatusCode))
-		return errors.New(fmt.Sprint(postResponse.StatusCode))
-	}
 	// init writer to update lines
 	uiliveWriter := uilive.New()
 	uiliveWriter.Start()
@@ -331,20 +324,20 @@ func sprintResponse(response ProgressResponse, w io.Writer) error {
 }
 
 // httpPost sends POST request to inserted url.
-func httpPost(endpoint string, payload interface{}) (*http.Response, error) {
+func httpPost(endpoint string, payload interface{}) error {
 	requestBody, err := json.Marshal(payload)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	arvanConfig := config.GetConfigInfo()
 	arvanURL, err := url.Parse(arvanConfig.GetServer())
 	if err != nil {
-		return nil, fmt.Errorf("invalid config")
+		return fmt.Errorf("invalid config")
 	}
 
 	httpReq, err := http.NewRequest(http.MethodPost, arvanURL.Scheme+"://"+arvanURL.Host+endpoint, bytes.NewBuffer(requestBody))
 	if err != nil {
-		return nil, err
+		return err
 	}
 	apikey := arvanConfig.GetApiKey()
 	if apikey != "" {
@@ -355,25 +348,25 @@ func httpPost(endpoint string, payload interface{}) (*http.Response, error) {
 	httpReq.Header.Add("User-Agent", rest.DefaultKubernetesUserAgent())
 	httpResp, err := http.DefaultClient.Do(httpReq)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	b, err := io.ReadAll(httpResp.Body)
+	responseBody, err := io.ReadAll(httpResp.Body)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	var r httpMessage
-	err = json.Unmarshal(b, &r)
+	var response ProgressResponse
+	err = json.Unmarshal(responseBody, &response)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if httpResp.StatusCode != http.StatusOK && httpResp.StatusCode != http.StatusFound {
-		return nil, errors.New(r.Message)
+		return errors.New(response.Message)
 	}
 
-	return httpResp, nil
+	return nil
 }
 
 // httpGet sends GET request to inserted url.
