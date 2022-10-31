@@ -27,22 +27,22 @@ import (
 )
 
 const (
-	migrationEndpoint = "/paas/v1/migrate"
+	migrationEndpoint = "/paas/v1/%s/migrate"
 	redColor          = "\033[31m"
 	greenColor        = "\033[32m"
 	yellowColor       = "\033[33m"
 	resetColor        = "\033[0m"
 	bamdad            = "ba1"
-	interval          = 10
+	interval          = 2
 )
 
 type State string
 
 const (
-	Pending   State = "Pending"
-	Doing     State = "Doing"
-	Completed State = "Completed"
-	Failed    State = "Failed"
+	Pending   State = "pending"
+	Doing     State = "doing"
+	Completed State = "completed"
+	Failed    State = "failed"
 )
 
 type Request struct {
@@ -69,10 +69,11 @@ type ZoneInfo struct {
 }
 
 type StepData struct {
-	Time     time.Time
-	Message  string
-	Percent  int
-	Response Response
+	Time        time.Time `json:"time"`
+	Message     string    `json:"message"`
+	Percent     int       `json:"percent"`
+	Source      ZoneInfo  `json:"source"`
+	Destination ZoneInfo  `json:"destination"`
 }
 
 type Step struct {
@@ -84,16 +85,11 @@ type Step struct {
 }
 
 type ProgressResponse struct {
-	State       State
-	Source      string
-	Destination string
-	Namespace   string
-	Steps       []Step
-}
-
-type Response struct {
-	Source      ZoneInfo `json:"source"`
-	Destination ZoneInfo `json:"destination"`
+	State       State  `json:"state"`
+	Source      string `json:"source"`
+	Destination string `json:"destination"`
+	Namespace   string `json:"namespace"`
+	Steps       []Step `json:"steps"`
 }
 
 // NewCmdMigrate returns new cobra commad enables user to migrate namespaces to another region on arvan servers.
@@ -256,17 +252,16 @@ func (v confirmationValidator) confirmationValidate(input string) (bool, error) 
 
 // migrate sends migration request and displays response.
 func migrate(request Request) error {
-	postResponse, err := httpPost(migrationEndpoint, request)
+	postResponse, err := httpPost(fmt.Sprintf(migrationEndpoint, request.Source), request)
 	if err != nil {
 		failureOutput(err.Error())
 		return err
 	}
 
-	if postResponse.StatusCode != http.StatusCreated {
+	if postResponse.StatusCode != http.StatusOK && postResponse.StatusCode != http.StatusFound {
 		failureOutput(fmt.Sprint(postResponse.StatusCode))
 		return errors.New(fmt.Sprint(postResponse.StatusCode))
 	}
-
 	// init writer to update lines
 	uiliveWriter := uilive.New()
 	uiliveWriter.Start()
@@ -278,7 +273,12 @@ func migrate(request Request) error {
 	stopChannel := make(chan bool, 1)
 
 	doEvery(interval*time.Second, stopChannel, func() {
-		response, _ := httpGet(migrationEndpoint)
+		response, err := httpGet(fmt.Sprintf(migrationEndpoint, request.Source))
+		if err != nil {
+			failureOutput(err.Error())
+			close(stopChannel)
+			return
+		}
 
 		sprintResponse(*response, tabWriter)
 
@@ -287,7 +287,7 @@ func migrate(request Request) error {
 			tabWriter.Flush()
 			uiliveWriter.Stop()
 
-			successOutput(&response.Steps[len(response.Steps)-1].Data.Response)
+			successOutput(response.Steps[len(response.Steps)-1].Data)
 		}
 
 		if response.State == Failed {
@@ -318,7 +318,7 @@ func doEvery(d time.Duration, stopChannel chan bool, f func()) {
 func sprintResponse(response ProgressResponse, w io.Writer) error {
 	responseStr := fmt.Sprintln("")
 	for _, s := range response.Steps {
-		responseStr += fmt.Sprintf("\t%s...\t\t%s\t%s\n", s.Title, s.State, s.Data.Message)
+		responseStr += fmt.Sprintf("\t%d-%s   \t\t\t%s\t%s\n", s.Order, s.Title, strings.Title(s.State), s.Data.Message)
 	}
 
 	fmt.Fprintf(w, "%s", responseStr)
@@ -355,7 +355,7 @@ func httpPost(endpoint string, payload interface{}) (*http.Response, error) {
 		return nil, err
 	}
 
-	if httpResp.StatusCode != http.StatusOK {
+	if httpResp.StatusCode != http.StatusOK && httpResp.StatusCode != http.StatusFound {
 		return nil, errors.New("server error. try again later")
 	}
 
@@ -412,14 +412,14 @@ func failureOutput(message string) {
 }
 
 // successOutput displays success output.
-func successOutput(response *Response) {
+func successOutput(data StepData) {
 	fmt.Println("\nYour IPs changed successfully")
 
 	ipTable := tablewriter.NewWriter(os.Stdout)
 	ipTable.SetHeader([]string{"Old IPs", "New IPs"})
 
-	for i := 0; i < len(response.Source.Services); i++ {
-		ipTable.Append([]string{redColor + response.Source.Services[i].IP + resetColor, greenColor + response.Destination.Services[i].IP + resetColor})
+	for i := 0; i < len(data.Source.Services); i++ {
+		ipTable.Append([]string{redColor + data.Source.Services[i].IP + resetColor, greenColor + data.Destination.Services[i].IP + resetColor})
 	}
 
 	ipTable.Render()
@@ -429,13 +429,13 @@ func successOutput(response *Response) {
 	nonfreeSourceRoutes := make([]Route, 0)
 	nonfreeDestinationRoutes := make([]Route, 0)
 
-	for i := 0; i < len(response.Source.Routes); i++ {
-		if response.Source.Routes[i].IsFree {
-			freeSourceRoutes = append(freeSourceRoutes, response.Source.Routes[i])
-			freeDestinationRoutes = append(freeDestinationRoutes, response.Destination.Routes[i])
+	for i := 0; i < len(data.Source.Routes); i++ {
+		if data.Source.Routes[i].IsFree {
+			freeSourceRoutes = append(freeSourceRoutes, data.Source.Routes[i])
+			freeDestinationRoutes = append(freeDestinationRoutes, data.Destination.Routes[i])
 		} else {
-			nonfreeSourceRoutes = append(nonfreeSourceRoutes, response.Source.Routes[i])
-			nonfreeDestinationRoutes = append(nonfreeDestinationRoutes, response.Destination.Routes[i])
+			nonfreeSourceRoutes = append(nonfreeSourceRoutes, data.Source.Routes[i])
+			nonfreeDestinationRoutes = append(nonfreeDestinationRoutes, data.Destination.Routes[i])
 		}
 	}
 
@@ -467,7 +467,7 @@ func successOutput(response *Response) {
 	gatewayTable.SetHeader([]string{"old gateway", "new gateway"})
 
 	fmt.Println("For non-free domains above, please change your gateway in your DNS provider as bellow:")
-	gatewayTable.Append([]string{redColor + response.Source.Gateway + resetColor, greenColor + response.Destination.Gateway + resetColor})
+	gatewayTable.Append([]string{redColor + data.Source.Gateway + resetColor, greenColor + data.Destination.Gateway + resetColor})
 	gatewayTable.Render()
 }
 

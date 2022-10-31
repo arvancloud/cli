@@ -48,8 +48,9 @@ func checkErr(err error, handleErr func(string, int)) {
 }
 
 // ReadInput prints explain and repeat printing inputExplain to out and reads a string from in.
-//   If input is empty and defaultVal is set returns default value
-//   If defaultVal is not set, tries to validate input using validate
+//
+//	If input is empty and defaultVal is set returns default value
+//	If defaultVal is not set, tries to validate input using validate
 func ReadInput(inputExplain, defaultVal string, out io.Writer, in io.Reader, validate func(string) (bool, error)) string {
 	reader := bufio.NewReader(in)
 	for {
