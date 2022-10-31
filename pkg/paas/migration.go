@@ -297,12 +297,6 @@ func (v confirmationValidator) confirmationValidate(input string) (bool, error) 
 
 // migrate sends migration request and displays response.
 func migrate(request Request) error {
-	err := httpPost(fmt.Sprintf(migrationEndpoint, request.Source), request)
-	if err != nil {
-		failureOutput(err.Error())
-		return err
-	}
-
 	// init writer to update lines
 	uiliveWriter := uilive.New()
 	uiliveWriter.Start()
