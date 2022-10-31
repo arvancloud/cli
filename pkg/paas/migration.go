@@ -90,6 +90,10 @@ type ProgressResponse struct {
 	Steps       []Step `json:"steps"`
 }
 
+type httpMessage struct {
+	Message string `json:"message"`
+}
+
 // NewCmdMigrate returns new cobra commad enables user to migrate namespaces to another region on arvan servers.
 func NewCmdMigrate(in io.Reader, out, errout io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
@@ -250,6 +254,7 @@ func (v confirmationValidator) confirmationValidate(input string) (bool, error) 
 
 // migrate sends migration request and displays response.
 func migrate(request Request) error {
+	fmt.Println("Migration is running in the background and may take a while.\nYou can optionally detach(Ctrl+C) for now and\ncontinue monitoring the process after using 'arvan paas migrate'.")
 	postResponse, err := httpPost(fmt.Sprintf(migrationEndpoint, request.Source), request)
 	if err != nil {
 		failureOutput(err.Error())
@@ -353,8 +358,19 @@ func httpPost(endpoint string, payload interface{}) (*http.Response, error) {
 		return nil, err
 	}
 
+	b, err := io.ReadAll(httpResp.Body)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	var r httpMessage
+	err = json.Unmarshal(b, &r)
+	if err != nil {
+		return nil, err
+	}
+
 	if httpResp.StatusCode != http.StatusOK && httpResp.StatusCode != http.StatusFound {
-		return nil, errors.New("server error. try again later")
+		return nil, errors.New(r.Message)
 	}
 
 	return httpResp, nil
