@@ -40,7 +40,7 @@ type State string
 
 const (
 	Pending   State = "pending"
-	Doing     State = "doing"
+	Running   State = "running"
 	Completed State = "completed"
 	Failed    State = "failed"
 )
@@ -69,11 +69,9 @@ type ZoneInfo struct {
 }
 
 type StepData struct {
-	Time        time.Time `json:"time"`
-	Message     string    `json:"message"`
-	Percent     int       `json:"percent"`
-	Source      ZoneInfo  `json:"source"`
-	Destination ZoneInfo  `json:"destination"`
+	Detail      string   `json:"detail"`
+	Source      ZoneInfo `json:"source"`
+	Destination ZoneInfo `json:"destination"`
 }
 
 type Step struct {
@@ -228,7 +226,7 @@ func migrationConfirm(project, region string, in io.Reader, writer io.Writer) bo
 	if err != nil {
 		return false
 	}
-	inputExplain := fmt.Sprintf(yellowColor+"\nWARNING: This will STOP your applications during migration process.\nYour data would still be safe and available in destination region."+resetColor+"\n\nPlease enter project's name [%s] to proceed: ", project)
+	inputExplain := fmt.Sprintf(yellowColor+"\nWARNING: This will STOP your applications during migration process.\nYour data would still be safe and available in source region."+resetColor+"\n\nPlease enter project's name [%s] to proceed: ", project)
 
 	defaultVal := ""
 
@@ -291,7 +289,7 @@ func migrate(request Request) error {
 		}
 
 		if response.State == Failed {
-			failureOutput(response.Steps[len(response.Steps)-1].Data.Message)
+			failureOutput(response.Steps[len(response.Steps)-1].Data.Detail)
 		}
 	})
 
@@ -318,7 +316,7 @@ func doEvery(d time.Duration, stopChannel chan bool, f func()) {
 func sprintResponse(response ProgressResponse, w io.Writer) error {
 	responseStr := fmt.Sprintln("")
 	for _, s := range response.Steps {
-		responseStr += fmt.Sprintf("\t%d-%s   \t\t\t%s\t%s\n", s.Order, s.Title, strings.Title(s.State), s.Data.Message)
+		responseStr += fmt.Sprintf("\t%d-%s   \t\t\t%s\t%s\n", s.Order, s.Title, strings.Title(s.State), s.Data.Detail)
 	}
 
 	fmt.Fprintf(w, "%s", responseStr)
