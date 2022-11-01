@@ -328,6 +328,10 @@ func migrate(request Request) error {
 		}
 
 		if response.State == Failed {
+			stopChannel <- true
+			tabWriter.Flush()
+			uiliveWriter.Stop()
+
 			failureOutput(response.Steps[len(response.Steps)-1].Data.Detail)
 		}
 	})
