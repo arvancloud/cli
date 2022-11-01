@@ -319,7 +319,7 @@ func migrate(request Request) error {
 
 		sprintResponse(*response, tabWriter)
 
-		if response.State == Completed || response.State == Failed {
+		if response.State == Completed {
 			stopChannel <- true
 			tabWriter.Flush()
 			uiliveWriter.Stop()
