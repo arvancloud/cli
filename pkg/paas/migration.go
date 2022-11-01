@@ -122,6 +122,7 @@ func NewCmdMigrate(in io.Reader, out, errout io.Writer) *cobra.Command {
 
 			if response.StatusCode == http.StatusOK {
 				if response.State == Completed || response.State == Failed {
+					fmt.Println("\nLast migration report is as bellow:")
 					migrate(request)
 					reMigrationConfirmed := reMigrationConfirm(in, explainOut)
 					if !reMigrationConfirmed {
@@ -274,7 +275,7 @@ func migrationConfirm(project, region string, in io.Reader, writer io.Writer) bo
 	if err != nil {
 		return false
 	}
-	inputExplain := fmt.Sprintf(yellowColor+"\nWARNING:\nThis will STOP your applications during migration process. Your data would still be safe and available in source region. Migration is running in the background and may take a while. You can optionally detach(Ctrl+C) for now and continue monitoring the process after using 'arvan paas migrate'."+resetColor+"\n\nPlease enter project's name [%s] to proceed: ", project)
+	inputExplain := fmt.Sprintf(yellowColor+"\nWARNING:\nThis will STOP applications during migration process. Your data would still be safe and available in source region. Migration is running in the background and may take a while. You can optionally detach(Ctrl+C) for now and continue monitoring the process after using 'arvan paas migrate'."+resetColor+"\n\nPlease enter project's name [%s] to proceed: ", project)
 
 	defaultVal := ""
 
@@ -462,7 +463,7 @@ func failureOutput(message string) {
 
 // successOutput displays success output.
 func successOutput(data StepData) {
-	fmt.Println("\nYour namespaces successfully migrated!")
+	fmt.Println("\nNamespaces successfully migrated!")
 
 	if len(data.Source.Services) > 0 {
 		ipTable := tablewriter.NewWriter(os.Stdout)
@@ -491,7 +492,7 @@ func successOutput(data StepData) {
 	}
 
 	if len(freeSourceDomains) > 0 {
-		fmt.Println("Your free domains changed successfully:")
+		fmt.Println("Free domains changed successfully:")
 
 		freeDomainTable := tablewriter.NewWriter(os.Stdout)
 		freeDomainTable.SetHeader([]string{"old free domains", "new free domains"})
@@ -518,7 +519,7 @@ func successOutput(data StepData) {
 		gatewayTable := tablewriter.NewWriter(os.Stdout)
 		gatewayTable.SetHeader([]string{"old gateway", "new gateway"})
 
-		fmt.Println("For non-free domains above, please change your gateway in your DNS provider as bellow:")
+		fmt.Println("For non-free domains above, please change gateway in DNS provider as bellow:")
 		gatewayTable.Append([]string{redColor + data.Source.Gateway + resetColor, greenColor + data.Destination.Gateway + resetColor})
 		gatewayTable.Render()
 	}
