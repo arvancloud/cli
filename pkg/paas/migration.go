@@ -358,8 +358,14 @@ func doEvery(d time.Duration, stopChannel chan bool, f func()) {
 // sprintResponse displays steps of migration.
 func sprintResponse(response ProgressResponse, w io.Writer) error {
 	responseStr := fmt.Sprintln("")
+	var detail string
+
 	for _, s := range response.Steps {
-		responseStr += fmt.Sprintf("\t%d-%s   \t\t\t%s\t%s\n", s.Order, s.Title, strings.Title(s.State), s.Data.Detail)
+		if response.State != Failed {
+			detail = s.Data.Detail
+		}
+
+		responseStr += fmt.Sprintf("\t%d-%s   \t\t\t%s\t%s\n", s.Order, s.Title, strings.Title(s.State), detail)
 	}
 
 	fmt.Fprintf(w, "%s", responseStr)
