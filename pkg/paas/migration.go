@@ -462,7 +462,7 @@ func httpGet(endpoint string) (*ProgressResponse, error) {
 
 // failureOutput displays failure output.
 func failureOutput(message string) {
-	fmt.Println("failed:", message)
+	fmt.Println(redColor + "\nFAILED: " + message + resetColor)
 }
 
 // successOutput displays success output.
