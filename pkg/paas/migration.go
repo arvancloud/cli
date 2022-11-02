@@ -120,18 +120,16 @@ func NewCmdMigrate(in io.Reader, out, errout io.Writer) *cobra.Command {
 				return
 			}
 
-			if response.StatusCode == http.StatusOK {
-				if response.State == Completed || response.State == Failed {
-					fmt.Println("\nLast migration report is as bellow:")
-					migrate(request)
-					reMigrationConfirmed := reMigrationConfirm(in, explainOut)
-					if !reMigrationConfirmed {
-						return
-					}
+			if response.StatusCode == http.StatusOK && (response.State == Completed || response.State == Failed) {
+				fmt.Printf("\nLast migration report of projetct \"%s\" is as bellow:\n", response.Namespace)
+				migrate(request)
+				reMigrationConfirmed := reMigrationConfirm(in, explainOut)
+				if !reMigrationConfirmed {
+					return
 				}
 			}
 
-			if response.StatusCode == http.StatusNotFound || response.StatusCode == http.StatusOK {
+			if response.State == Completed || response.State == Failed {
 				project, err := getSelectedProject(in, explainOut)
 				if err != nil {
 					failureOutput(err.Error())
@@ -155,10 +153,7 @@ func NewCmdMigrate(in io.Reader, out, errout io.Writer) *cobra.Command {
 				request.Namespace = project
 				request.Destination = fmt.Sprintf("%s-%s", destinationRegion.RegionName, destinationRegion.Name)
 
-			}
-
-			if response.StatusCode != http.StatusFound {
-				err := httpPost(fmt.Sprintf(migrationEndpoint, request.Source), request)
+				err = httpPost(fmt.Sprintf(migrationEndpoint, request.Source), request)
 				if err != nil {
 					failureOutput(err.Error())
 					return
@@ -365,7 +360,7 @@ func sprintResponse(response ProgressResponse, w io.Writer) error {
 			detail = s.Data.Detail
 		}
 
-		responseStr += fmt.Sprintf("\t%d-%s   \t\t\t%s\t%s\n", s.Order, s.Title, strings.Title(s.State), detail)
+		responseStr += fmt.Sprintf("\t%s   \t\t\t%s\t%s\n", s.Title, strings.Title(s.State), detail)
 	}
 
 	fmt.Fprintf(w, "%s", responseStr)
@@ -444,6 +439,7 @@ func httpGet(endpoint string) (*ProgressResponse, error) {
 	httpReq.Header.Add("User-Agent", rest.DefaultKubernetesUserAgent())
 	httpResp, err := http.DefaultClient.Do(httpReq)
 	if err != nil {
+		failureOutput("Migration is running in the background. You can continue monitoring the process using 'arvan paas migrate'.")
 		return nil, err
 	}
 
