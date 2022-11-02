@@ -170,6 +170,7 @@ func NewCmdMigrate(in io.Reader, out, errout io.Writer) *cobra.Command {
 	return cmd
 }
 
+// reMigrationConfirm makes sure that user enters yes/no correctly.
 func reMigrationConfirm(in io.Reader, writer io.Writer) bool {
 	inputExplain := "Do you want to run a new migration?[y/N]: "
 
@@ -179,6 +180,7 @@ func reMigrationConfirm(in io.Reader, writer io.Writer) bool {
 	return value == "y"
 }
 
+// confirmationValidate checks yes/no entry
 func confirmationValidate(input string) (bool, error) {
 	if input != "y" && input != "N" {
 		return false, fmt.Errorf("enter a valid answer 'y' for \"yes\" or 'N' for \"no\"")
