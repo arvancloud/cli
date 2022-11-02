@@ -439,6 +439,7 @@ func httpGet(endpoint string) (*ProgressResponse, error) {
 	httpReq.Header.Add("User-Agent", rest.DefaultKubernetesUserAgent())
 	httpResp, err := http.DefaultClient.Do(httpReq)
 	if err != nil {
+		failureOutput("Migration is running in the background. You can continue monitoring the process using 'arvan paas migrate'.")
 		return nil, err
 	}
 
