@@ -365,7 +365,7 @@ func sprintResponse(response ProgressResponse, w io.Writer) error {
 			detail = s.Data.Detail
 		}
 
-		responseStr += fmt.Sprintf("\t%d-%s   \t\t\t%s\t%s\n", s.Order, s.Title, strings.Title(s.State), detail)
+		responseStr += fmt.Sprintf("\t%s   \t\t\t%s\t%s\n", s.Title, strings.Title(s.State), detail)
 	}
 
 	fmt.Fprintf(w, "%s", responseStr)
