@@ -120,18 +120,16 @@ func NewCmdMigrate(in io.Reader, out, errout io.Writer) *cobra.Command {
 				return
 			}
 
-			if response.StatusCode == http.StatusOK {
-				if response.State == Completed || response.State == Failed {
-					fmt.Printf("\nLast migration report of projetct \"%s\" is as bellow:\n", response.Namespace)
-					migrate(request)
-					reMigrationConfirmed := reMigrationConfirm(in, explainOut)
-					if !reMigrationConfirmed {
-						return
-					}
+			if response.StatusCode == http.StatusOK && (response.State == Completed || response.State == Failed) {
+				fmt.Printf("\nLast migration report of projetct \"%s\" is as bellow:\n", response.Namespace)
+				migrate(request)
+				reMigrationConfirmed := reMigrationConfirm(in, explainOut)
+				if !reMigrationConfirmed {
+					return
 				}
 			}
 
-			if response.StatusCode == http.StatusNotFound || response.StatusCode == http.StatusOK {
+			if response.State == Completed || response.State == Failed {
 				project, err := getSelectedProject(in, explainOut)
 				if err != nil {
 					failureOutput(err.Error())
@@ -155,10 +153,7 @@ func NewCmdMigrate(in io.Reader, out, errout io.Writer) *cobra.Command {
 				request.Namespace = project
 				request.Destination = fmt.Sprintf("%s-%s", destinationRegion.RegionName, destinationRegion.Name)
 
-			}
-
-			if response.StatusCode != http.StatusFound {
-				err := httpPost(fmt.Sprintf(migrationEndpoint, request.Source), request)
+				err = httpPost(fmt.Sprintf(migrationEndpoint, request.Source), request)
 				if err != nil {
 					failureOutput(err.Error())
 					return
