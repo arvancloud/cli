@@ -521,9 +521,7 @@ func successOutput(data StepData) {
 		}
 
 		nonFreeDomainTable.Render()
-	}
 
-	if len(freeSourceDomains) > 0 {
 		gatewayTable := tablewriter.NewWriter(os.Stdout)
 		gatewayTable.SetHeader([]string{"old gateway", "new gateway"})
 
