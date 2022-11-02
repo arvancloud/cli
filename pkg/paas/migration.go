@@ -8,28 +8,41 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
-	"net/url"
+	"text/tabwriter"
+	"time"
 
 	"github.com/arvancloud/cli/pkg/api"
 	"github.com/arvancloud/cli/pkg/config"
 	"github.com/arvancloud/cli/pkg/utl"
-	"github.com/olekukonko/tablewriter"
-	"k8s.io/client-go/rest"
 
+	"github.com/gosuri/uilive"
+	"github.com/olekukonko/tablewriter"
 	"github.com/openshift/oc/pkg/helpers/term"
 	"github.com/spf13/cobra"
+	"k8s.io/client-go/rest"
 )
 
 const (
-	migrationEndpoint = "/paas/v1/migrate"
+	migrationEndpoint = "/paas/v1/%s/migrate"
 	redColor          = "\033[31m"
 	greenColor        = "\033[32m"
 	yellowColor       = "\033[33m"
 	resetColor        = "\033[0m"
 	bamdad            = "ba1"
+	interval          = 2
+)
+
+type State string
+
+const (
+	Pending   State = "pending"
+	Running   State = "running"
+	Completed State = "completed"
+	Failed    State = "failed"
 )
 
 type Request struct {
@@ -43,7 +56,7 @@ type Service struct {
 	IP   string `json:"ip"`
 }
 
-type Route struct {
+type Domain struct {
 	Name   string `json:"name"`
 	Host   string `json:"host"`
 	IsFree bool   `json:"is_free"`
@@ -51,13 +64,32 @@ type Route struct {
 
 type ZoneInfo struct {
 	Services []Service `json:"services"`
-	Routes   []Route   `json:"routes"`
+	Domains  []Domain  `json:"domains"`
 	Gateway  string    `json:"gateway"`
 }
 
-type Response struct {
+type StepData struct {
+	Detail      string   `json:"detail"`
 	Source      ZoneInfo `json:"source"`
 	Destination ZoneInfo `json:"destination"`
+}
+
+type Step struct {
+	Order int
+	Step  string
+	Title string
+	State string
+	Data  StepData
+}
+
+type ProgressResponse struct {
+	State       State  `json:"state"`
+	Source      string `json:"source"`
+	Destination string `json:"destination"`
+	Namespace   string `json:"namespace"`
+	Message     string `json:"message"`
+	StatusCode  int    `json:"StatusCode"`
+	Steps       []Step `json:"steps"`
 }
 
 // NewCmdMigrate returns new cobra commad enables user to migrate namespaces to another region on arvan servers.
@@ -70,42 +102,90 @@ func NewCmdMigrate(in io.Reader, out, errout io.Writer) *cobra.Command {
 			explainOut := term.NewResponsiveWriter(out)
 			c.SetOutput(explainOut)
 
-			project, _ := getSelectedProject(in, explainOut)
-
 			currentRegionName := getCurrentRegion()
 
-			if currentRegionName == bamdad {
-				log.Printf("migration from region %s is not possible now\nplease first switch your region using command:\n\n \tarvan paas region\n\n", currentRegionName)
-				return
+			request := Request{
+				Source: currentRegionName,
 			}
 
-			destinationRegion, err := getZoneByName(bamdad)
-			utl.CheckErr(err)
-
-			if currentRegionName == getRegionFromEndpoint(destinationRegion.Endpoint) {
-				log.Printf("can not migrate to this region")
-				return
-			}
-
-			confirmed := migrationConfirm(project, getRegionFromEndpoint(destinationRegion.Endpoint), in, explainOut)
-			if !confirmed {
-				return
-			}
-
-			requset := Request{
-				Namespace:   project,
-				Source:      currentRegionName,
-				Destination: fmt.Sprintf("%s-%s", destinationRegion.RegionName, destinationRegion.Name),
-			}
-
-			err = migrate(requset)
+			response, err := httpGet(fmt.Sprintf(migrationEndpoint, request.Source))
 			if err != nil {
-				log.Println(err)
+				failureOutput(err.Error())
+				return
+			}
+
+			if response.StatusCode == http.StatusBadRequest {
+				failureOutput(response.Message)
+
+				return
+			}
+
+			if response.StatusCode == http.StatusOK && (response.State == Completed || response.State == Failed) {
+				fmt.Printf("\nLast migration report of projetct \"%s\" is as bellow:\n", response.Namespace)
+				migrate(request)
+				reMigrationConfirmed := reMigrationConfirm(in, explainOut)
+				if !reMigrationConfirmed {
+					return
+				}
+			}
+
+			if response.State == Completed || response.State == Failed {
+				project, err := getSelectedProject(in, explainOut)
+				if err != nil {
+					failureOutput(err.Error())
+
+					return
+				}
+
+				destinationRegion, err := getZoneByName(bamdad)
+				utl.CheckErr(err)
+
+				if currentRegionName == getRegionFromEndpoint(destinationRegion.Endpoint) {
+					log.Printf("can not migrate to this region")
+					return
+				}
+
+				confirmed := migrationConfirm(project, getRegionFromEndpoint(destinationRegion.Endpoint), in, explainOut)
+				if !confirmed {
+					return
+				}
+
+				request.Namespace = project
+				request.Destination = fmt.Sprintf("%s-%s", destinationRegion.RegionName, destinationRegion.Name)
+
+				err = httpPost(fmt.Sprintf(migrationEndpoint, request.Source), request)
+				if err != nil {
+					failureOutput(err.Error())
+					return
+				}
+			}
+
+			err = migrate(request)
+			if err != nil {
+				failureOutput(err.Error())
 			}
 		},
 	}
 
 	return cmd
+}
+
+// reMigrationConfirm makes sure that user enters yes/no correctly.
+func reMigrationConfirm(in io.Reader, writer io.Writer) bool {
+	inputExplain := "Do you want to run a new migration?[y/N]: "
+
+	defaultVal := "N"
+
+	value := utl.ReadInput(inputExplain, defaultVal, writer, in, confirmationValidate)
+	return value == "y"
+}
+
+// confirmationValidate checks yes/no entry
+func confirmationValidate(input string) (bool, error) {
+	if input != "y" && input != "N" {
+		return false, fmt.Errorf("enter a valid answer 'y' for \"yes\" or 'N' for \"no\"")
+	}
+	return true, nil
 }
 
 // getSelectedProject gets intending namespace to migrate.
@@ -192,7 +272,7 @@ func migrationConfirm(project, region string, in io.Reader, writer io.Writer) bo
 	if err != nil {
 		return false
 	}
-	inputExplain := fmt.Sprintf(yellowColor+"\nWARNING: This will STOP your applications during migration process."+resetColor+"\n\nPlease enter project's name [%s] to proceed: ", project)
+	inputExplain := fmt.Sprintf(yellowColor+"\nWARNING:\nThis will STOP applications during migration process. Your data would still be safe and available in source region. Migration is running in the background and may take a while. You can optionally detach(Ctrl+C) for now and continue monitoring the process after using 'arvan paas migrate'."+resetColor+"\n\nPlease enter project's name [%s] to proceed: ", project)
 
 	defaultVal := ""
 
@@ -216,29 +296,139 @@ func (v confirmationValidator) confirmationValidate(input string) (bool, error) 
 
 // migrate sends migration request and displays response.
 func migrate(request Request) error {
-	response, err := httpPost(migrationEndpoint, request)
-	if err != nil {
-		failureOutput()
-		return err
+	// init writer to update lines
+	uiliveWriter := uilive.New()
+	uiliveWriter.Start()
+
+	// init writer to display lines in column
+	tabWriter := new(tabwriter.Writer)
+	tabWriter.Init(uiliveWriter, 0, 8, 0, '\t', 0)
+
+	stopChannel := make(chan bool, 1)
+
+	doEvery(interval*time.Second, stopChannel, func() {
+		response, err := httpGet(fmt.Sprintf(migrationEndpoint, request.Source))
+		if err != nil {
+			failureOutput(err.Error())
+			stopChannel <- true
+			return
+		}
+
+		sprintResponse(*response, tabWriter)
+
+		if response.State == Completed {
+			stopChannel <- true
+			tabWriter.Flush()
+			uiliveWriter.Stop()
+
+			successOutput(response.Steps[len(response.Steps)-1].Data)
+		}
+
+		if response.State == Failed {
+			stopChannel <- true
+			tabWriter.Flush()
+			uiliveWriter.Stop()
+
+			failureOutput(response.Steps[len(response.Steps)-1].Data.Detail)
+		}
+	})
+
+	return nil
+}
+
+// doEvery runs given function in periods of 'd' and stops using stopChannel.
+func doEvery(d time.Duration, stopChannel chan bool, f func()) {
+	ticker := time.NewTicker(d)
+
+	for {
+		f()
+		select {
+		case <-ticker.C:
+			continue
+		case <-stopChannel:
+			ticker.Stop()
+			return
+		}
 	}
-	successOutput(response)
-	
+}
+
+// sprintResponse displays steps of migration.
+func sprintResponse(response ProgressResponse, w io.Writer) error {
+	responseStr := fmt.Sprintln("")
+	var detail string
+
+	for _, s := range response.Steps {
+		if response.State != Failed {
+			detail = s.Data.Detail
+		}
+
+		responseStr += fmt.Sprintf("\t%s   \t\t\t%s\t%s\n", s.Title, strings.Title(s.State), detail)
+	}
+
+	fmt.Fprintf(w, "%s", responseStr)
+	time.Sleep(time.Millisecond * 100)
+
 	return nil
 }
 
 // httpPost sends POST request to inserted url.
-func httpPost(endpoint string, payload interface{}) (*Response, error) {
+func httpPost(endpoint string, payload interface{}) error {
 	requestBody, err := json.Marshal(payload)
 	if err != nil {
-		return nil, err
+		return err
 	}
+	arvanConfig := config.GetConfigInfo()
+	arvanURL, err := url.Parse(arvanConfig.GetServer())
+	if err != nil {
+		return fmt.Errorf("invalid config")
+	}
+
+	httpReq, err := http.NewRequest(http.MethodPost, arvanURL.Scheme+"://"+arvanURL.Host+endpoint, bytes.NewBuffer(requestBody))
+	if err != nil {
+		return err
+	}
+	apikey := arvanConfig.GetApiKey()
+	if apikey != "" {
+		httpReq.Header.Add("Authorization", apikey)
+	}
+
+	httpReq.Header.Add("accept", "application/json")
+	httpReq.Header.Add("User-Agent", rest.DefaultKubernetesUserAgent())
+	httpResp, err := http.DefaultClient.Do(httpReq)
+	if err != nil {
+		return err
+	}
+
+	// read body
+	defer httpResp.Body.Close()
+	responseBody, err := io.ReadAll(httpResp.Body)
+	if err != nil {
+		return err
+	}
+
+	// parse response
+	var response ProgressResponse
+	err = json.Unmarshal(responseBody, &response)
+	if err != nil {
+		return err
+	}
+
+	if httpResp.StatusCode != http.StatusOK && httpResp.StatusCode != http.StatusFound {
+		return errors.New(response.Message)
+	}
+
+	return nil
+}
+
+// httpGet sends GET request to inserted url.
+func httpGet(endpoint string) (*ProgressResponse, error) {
 	arvanConfig := config.GetConfigInfo()
 	arvanURL, err := url.Parse(arvanConfig.GetServer())
 	if err != nil {
 		return nil, fmt.Errorf("invalid config")
 	}
 
-	httpReq, err := http.NewRequest(http.MethodPost, arvanURL.Scheme + "://" + arvanURL.Host+endpoint, bytes.NewBuffer(requestBody))
+	httpReq, err := http.NewRequest(http.MethodGet, arvanURL.Scheme+"://"+arvanURL.Host+endpoint, bytes.NewBuffer([]byte{}))
 	if err != nil {
 		return nil, err
 	}
@@ -251,11 +441,8 @@ func httpPost(endpoint string, payload interface{}) (*Response, error) {
 	httpReq.Header.Add("User-Agent", rest.DefaultKubernetesUserAgent())
 	httpResp, err := http.DefaultClient.Do(httpReq)
 	if err != nil {
+		failureOutput("Migration is running in the background. You can continue monitoring the process using 'arvan paas migrate'.")
 		return nil, err
-	}
-
-	if httpResp.StatusCode != http.StatusOK {
-		return nil, errors.New("server error. try again later")
 	}
 
 	// read body
@@ -266,77 +453,84 @@ func httpPost(endpoint string, payload interface{}) (*Response, error) {
 	}
 
 	// parse response
-	var response Response
+	var response ProgressResponse
 	err = json.Unmarshal(responseBody, &response)
 	if err != nil {
 		return nil, err
 	}
+
+	response.StatusCode = httpResp.StatusCode
+
 	return &response, nil
 }
 
 // failureOutput displays failure output.
-func failureOutput() {
-	fmt.Println("failed to migrate")
+func failureOutput(message string) {
+	fmt.Println(redColor + "\nFAILED: " + message + resetColor)
 }
 
 // successOutput displays success output.
-func successOutput(response *Response) {
-	fmt.Println("\nYour IPs changed successfully")
+func successOutput(data StepData) {
+	fmt.Println("\nNamespaces successfully migrated!")
 
-	ipTable := tablewriter.NewWriter(os.Stdout)
-	ipTable.SetHeader([]string{"Old IPs", "New IPs"})
+	if len(data.Source.Services) > 0 {
+		ipTable := tablewriter.NewWriter(os.Stdout)
+		ipTable.SetHeader([]string{"Old IPs", "New IPs"})
 
-	for i := 0; i < len(response.Source.Services); i++ {
-		ipTable.Append([]string{redColor + response.Source.Services[i].IP + resetColor, greenColor + response.Destination.Services[i].IP + resetColor})
+		for i := 0; i < len(data.Source.Services); i++ {
+			ipTable.Append([]string{redColor + data.Source.Services[i].IP + resetColor, greenColor + data.Destination.Services[i].IP + resetColor})
+		}
+
+		ipTable.Render()
 	}
 
-	ipTable.Render()
+	freeSourceDomains := make([]Domain, 0)
+	freeDestinationDomains := make([]Domain, 0)
+	nonfreeSourceDomains := make([]Domain, 0)
+	nonfreeDestinationDomains := make([]Domain, 0)
 
-	freeSourceRoutes := make([]Route, 0)
-	freeDestinationRoutes := make([]Route, 0)
-	nonfreeSourceRoutes := make([]Route, 0)
-	nonfreeDestinationRoutes := make([]Route, 0)
-
-	for i := 0; i < len(response.Source.Routes); i++ {
-		if response.Source.Routes[i].IsFree {
-			freeSourceRoutes = append(freeSourceRoutes, response.Source.Routes[i])
-			freeDestinationRoutes = append(freeDestinationRoutes, response.Destination.Routes[i])
+	for i := 0; i < len(data.Source.Domains); i++ {
+		if data.Source.Domains[i].IsFree {
+			freeSourceDomains = append(freeSourceDomains, data.Source.Domains[i])
+			freeDestinationDomains = append(freeDestinationDomains, data.Destination.Domains[i])
 		} else {
-			nonfreeSourceRoutes = append(nonfreeSourceRoutes, response.Source.Routes[i])
-			nonfreeDestinationRoutes = append(nonfreeDestinationRoutes, response.Destination.Routes[i])
+			nonfreeSourceDomains = append(nonfreeSourceDomains, data.Source.Domains[i])
+			nonfreeDestinationDomains = append(nonfreeDestinationDomains, data.Destination.Domains[i])
 		}
 	}
 
-	if len(freeSourceRoutes) > 0 {
-		fmt.Println("Your free routes changed successfully:")
+	if len(freeSourceDomains) > 0 {
+		fmt.Println("Free domains changed successfully:")
 
-		freeRouteTable := tablewriter.NewWriter(os.Stdout)
-		freeRouteTable.SetHeader([]string{"old free routes", "new free routes"})
+		freeDomainTable := tablewriter.NewWriter(os.Stdout)
+		freeDomainTable.SetHeader([]string{"old free domains", "new free domains"})
 
-		for i := 0; i < len(freeSourceRoutes); i++ {
-			freeRouteTable.Append([]string{redColor + freeSourceRoutes[i].Host + resetColor, greenColor + freeDestinationRoutes[i].Host + resetColor})
+		for i := 0; i < len(freeSourceDomains); i++ {
+			freeDomainTable.Append([]string{redColor + freeSourceDomains[i].Host + resetColor, greenColor + freeDestinationDomains[i].Host + resetColor})
 		}
 
-		freeRouteTable.Render()
+		freeDomainTable.Render()
 	}
 
-	if len(nonfreeSourceRoutes) > 0 {
-		nonFreeRouteTable := tablewriter.NewWriter(os.Stdout)
-		nonFreeRouteTable.SetHeader([]string{"non-free routes"})
+	if len(nonfreeSourceDomains) > 0 {
+		nonFreeDomainTable := tablewriter.NewWriter(os.Stdout)
+		nonFreeDomainTable.SetHeader([]string{"non-free domains"})
 
-		for i := 0; i < len(nonfreeSourceRoutes); i++ {
-			nonFreeRouteTable.Append([]string{yellowColor + nonfreeDestinationRoutes[i].Host + resetColor})
+		for i := 0; i < len(nonfreeSourceDomains); i++ {
+			nonFreeDomainTable.Append([]string{yellowColor + nonfreeDestinationDomains[i].Host + resetColor})
 		}
 
-		nonFreeRouteTable.Render()
+		nonFreeDomainTable.Render()
 	}
 
-	gatewayTable := tablewriter.NewWriter(os.Stdout)
-	gatewayTable.SetHeader([]string{"old gateway", "new gateway"})
+	if len(freeSourceDomains) > 0 {
+		gatewayTable := tablewriter.NewWriter(os.Stdout)
+		gatewayTable.SetHeader([]string{"old gateway", "new gateway"})
 
-	fmt.Println("For non-free domains above, please change your gateway in your DNS provider as bellow:")
-	gatewayTable.Append([]string{redColor + response.Source.Gateway + resetColor, greenColor + response.Destination.Gateway + resetColor})
-	gatewayTable.Render()
+		fmt.Println("For non-free domains above, please change gateway in DNS provider as bellow:")
+		gatewayTable.Append([]string{redColor + data.Source.Gateway + resetColor, greenColor + data.Destination.Gateway + resetColor})
+		gatewayTable.Render()
+	}
 }
 
 // getZoneByName gets zone from list of active zones giving it's name.

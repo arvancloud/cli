@@ -21,7 +21,7 @@ const (
 	updateServer    = "https://cli.arvan.run"
 )
 
-//GetUserInfo returns a dictionary of user info if authentication credentials is valid.
+// GetUserInfo returns a dictionary of user info if authentication credentials is valid.
 func GetUserInfo(apikey string) (map[string]string, error) {
 	arvanConfig := config.GetConfigInfo()
 	arvanServer := arvanConfig.GetServer()
@@ -60,8 +60,7 @@ func GetUserInfo(apikey string) (map[string]string, error) {
 	return user, nil
 }
 
-
-//GetZones from PaaS API
+// GetZones from PaaS API
 func GetZones() (config.Region, error) {
 	var regions config.Region
 	arvanConfig := config.GetConfigInfo()
@@ -69,8 +68,8 @@ func GetZones() (config.Region, error) {
 	if err != nil {
 		return regions, fmt.Errorf("invalid config")
 	}
-	
-	httpReq, err := http.NewRequest("GET", arvanURL.Scheme + "://" + arvanURL.Host+regionsEndpoint, nil)
+
+	httpReq, err := http.NewRequest("GET", arvanURL.Scheme+"://"+arvanURL.Host+regionsEndpoint, nil)
 	if err != nil {
 		return regions, err
 	}

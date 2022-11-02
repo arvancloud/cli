@@ -12,6 +12,7 @@ require (
 	github.com/docker/docker v20.10.0+incompatible // indirect
 	github.com/fsouza/go-dockerclient v1.6.6 // indirect
 	github.com/gonum/graph v0.0.0-20190426092945-678096d81a4b // indirect
+	github.com/gosuri/uilive v0.0.4
 	github.com/inconshreveable/go-update v0.0.0-20160112193335-8152e7eb6ccf
 	github.com/mitchellh/go-wordwrap v1.0.1 // indirect
 	github.com/moby/buildkit v0.8.0 // indirect
