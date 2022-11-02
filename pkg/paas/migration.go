@@ -122,7 +122,7 @@ func NewCmdMigrate(in io.Reader, out, errout io.Writer) *cobra.Command {
 
 			if response.StatusCode == http.StatusOK {
 				if response.State == Completed || response.State == Failed {
-					fmt.Println("\nLast migration report is as bellow:")
+					fmt.Printf("\nLast migration report of projetct \"%s\" is as bellow:\n", response.Namespace)
 					migrate(request)
 					reMigrationConfirmed := reMigrationConfirm(in, explainOut)
 					if !reMigrationConfirmed {
