@@ -213,7 +213,7 @@ func sprintRegions(activeZones, inactiveRegions []config.Zone) string {
 		}
 	}
 	for i := 0; i < len(inactiveRegions); i++ {
-		result += fmt.Sprintf("  [-] %s-%s (inactive)\n", inactiveRegions[i].RegionName, inactiveRegions[i].Name)
+		result += fmt.Sprintf("  [-] %s-%s (down)\n", inactiveRegions[i].RegionName, inactiveRegions[i].Name)
 	}
 	return result
 }
@@ -221,7 +221,7 @@ func sprintRegions(activeZones, inactiveRegions []config.Zone) string {
 func getActiveAndInactiveZones(zones []config.Zone) ([]config.Zone, []config.Zone) {
 	var activeZones, inactiveZones []config.Zone
 	for i := 0; i < len(zones); i++ {
-		if zones[i].Active {
+		if zones[i].Status == "UP" {
 			activeZones = append(activeZones, zones[i])
 		} else {
 			inactiveZones = append(inactiveZones, zones[i])
