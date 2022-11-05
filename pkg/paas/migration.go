@@ -137,7 +137,11 @@ func NewCmdMigrate(in io.Reader, out, errout io.Writer) *cobra.Command {
 				}
 			}
 
+<<<<<<< HEAD
 			if response.State == Completed || response.State == Failed || response.StatusCode == http.StatusNotFound {
+=======
+			if response.StatusCode == http.StatusNotFound || response.State == Completed || response.State == Failed {
+>>>>>>> 16d1fc0 (Add migration not found handler)
 				project, err := getSelectedProject(in, explainOut)
 				if err != nil {
 					failureOutput(err.Error())
@@ -274,13 +278,13 @@ func sprintProjects(projects []string) string {
 
 // migrationConfirm gets confirmation of proceeding namespace migration by asking user to enter namespace's name.
 func migrationConfirm(project, region string, in io.Reader, writer io.Writer) bool {
-	explain := fmt.Sprintf("\nYou're about to migrate \"%s\" from region \"%s\" to \"%s\".\n", project, getCurrentRegion(), region)
+	explain := fmt.Sprintf("\nYou're about to migrate \"%s\" from region \"%s\" to \"%s\".\n\n"+yellowColor+"WARNING:\nThis will STOP applications during migration process. Your data would still be safe and available in source region. Migration is running in the background and may take a while. You can optionally detach(Ctrl+C) for now and continue monitoring the process after using 'arvan paas migrate'."+resetColor+"\n\n", project, getCurrentRegion(), region)
 
 	_, err := fmt.Fprint(writer, explain)
 	if err != nil {
 		return false
 	}
-	inputExplain := fmt.Sprintf(yellowColor+"\nWARNING:\nThis will STOP applications during migration process. Your data would still be safe and available in source region. Migration is running in the background and may take a while. You can optionally detach(Ctrl+C) for now and continue monitoring the process after using 'arvan paas migrate'."+resetColor+"\n\nPlease enter project's name [%s] to proceed: ", project)
+	inputExplain := fmt.Sprintf("Please enter project's name [%s] to proceed: ", project)
 
 	defaultVal := ""
 
