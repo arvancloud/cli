@@ -137,11 +137,7 @@ func NewCmdMigrate(in io.Reader, out, errout io.Writer) *cobra.Command {
 				}
 			}
 
-<<<<<<< HEAD
 			if response.State == Completed || response.State == Failed || response.StatusCode == http.StatusNotFound {
-=======
-			if response.StatusCode == http.StatusNotFound || response.State == Completed || response.State == Failed {
->>>>>>> 16d1fc0 (Add migration not found handler)
 				project, err := getSelectedProject(in, explainOut)
 				if err != nil {
 					failureOutput(err.Error())
