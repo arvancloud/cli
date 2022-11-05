@@ -18,14 +18,20 @@ import (
 	"github.com/arvancloud/cli/pkg/api"
 	"github.com/arvancloud/cli/pkg/config"
 	"github.com/arvancloud/cli/pkg/utl"
-	"golang.org/x/text/cases"
-	"golang.org/x/text/language"
 
 	"github.com/gosuri/uilive"
 	"github.com/olekukonko/tablewriter"
 	"github.com/openshift/oc/pkg/helpers/term"
 	"github.com/spf13/cobra"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 	"k8s.io/client-go/rest"
+)
+
+var (
+	migrateLong = `
+    Migration of user's namespaces from one region to another
+	`
 )
 
 const (
@@ -99,7 +105,7 @@ func NewCmdMigrate(in io.Reader, out, errout io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "migrate",
 		Short: "Migrate namespaces to destination region",
-		Long:  loginLong,
+		Long:  migrateLong,
 		Run: func(c *cobra.Command, args []string) {
 			explainOut := term.NewResponsiveWriter(out)
 			c.SetOutput(explainOut)
@@ -460,6 +466,7 @@ func httpGet(endpoint string) (*ProgressResponse, error) {
 	var response ProgressResponse
 	err = json.Unmarshal(responseBody, &response)
 	if err != nil {
+		failureOutput("Migration is running in the background. You can continue monitoring the process using 'arvan paas migrate'.")
 		return nil, err
 	}
 
