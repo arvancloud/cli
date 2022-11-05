@@ -18,6 +18,8 @@ import (
 	"github.com/arvancloud/cli/pkg/api"
 	"github.com/arvancloud/cli/pkg/config"
 	"github.com/arvancloud/cli/pkg/utl"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 
 	"github.com/gosuri/uilive"
 	"github.com/olekukonko/tablewriter"
@@ -362,7 +364,9 @@ func sprintResponse(response ProgressResponse, w io.Writer) error {
 			detail = s.Data.Detail
 		}
 
-		responseStr += fmt.Sprintf("\t%s   \t\t\t%s\t%s\n", s.Title, strings.Title(s.State), detail)
+		caser := cases.Title(language.English)
+
+		responseStr += fmt.Sprintf("\t%s   \t\t\t%s\t%s\n", s.Title, caser.String(s.State), detail)
 	}
 
 	fmt.Fprintf(w, "%s", responseStr)
