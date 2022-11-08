@@ -5,6 +5,8 @@ import (
 	"io/ioutil"
 	"sync"
 
+	"github.com/arvancloud/cli/pkg/utl"
+
 	"gopkg.in/yaml.v2"
 )
 
@@ -12,6 +14,7 @@ type configFile struct {
 	ApiVersion string `yaml:"apiVersion"`
 	Server     string `yaml:"server"`
 	ApiKey     string `yaml:"apikey"`
+	Region     string `yaml:"region"`
 }
 
 var instance *ConfigInfo
@@ -40,6 +43,12 @@ func LoadConfigFile() (bool, error) {
 		if err != nil {
 			return false, err
 		}
+
+		if configFileStruct.Region != "" {
+			_, err = arvanConfig.SaveConfig()
+			utl.CheckErr(err)
+		}
+
 		arvanConfig.apiKey = configFileStruct.ApiKey
 		arvanConfig.server = configFileStruct.Server
 		return true, nil
