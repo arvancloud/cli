@@ -552,19 +552,17 @@ func getZoneByName(name string) (*config.Zone, error) {
 		return nil, errors.New("invalid region info")
 	}
 
-	activeZones, _ := getActiveAndInactiveZones(regions.Zones)
+	upZones, _ := getUpAndDownZones(regions.Zones)
 
-	if len(activeZones) < 1 {
+	if len(upZones) < 1 {
 		return nil, errors.New("no active region available")
 	}
 
-	for i, zone := range activeZones {
+	for i, zone := range upZones {
 		if zone.Name == name {
-			return &activeZones[i], nil
+			return &upZones[i], nil
 		}
 	}
 
-	log.Printf("destination region not found")
-
-	return nil, nil
+	return nil, errors.New("destination region not found")
 }

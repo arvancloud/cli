@@ -61,6 +61,32 @@ func NewCmdPaas() *cobra.Command {
 			fmt.Fprint(w, strings.Repeat("*", 50))
 			fmt.Fprint(w, "\n")
 		}
+
+		// To warn user not to duplicate projects if they have a migration plan
+		if cmd.Name() == "new-project" {
+			regions, err := api.GetZones()
+			if err != nil {
+				failureOutput("failed to get zones")
+				return
+			}
+
+			if len(regions.Zones) < 1 {
+				failureOutput("invalid region info")
+				return
+			}
+
+			currentRegionAbbr := getCurrentRegion()
+
+			currentRegionName := currentRegionAbbr[strings.LastIndex(currentRegionAbbr, "-")+1:]
+
+			currentRegion, err := getZoneByName(currentRegionName)
+			utl.CheckErr(err)
+
+			_, inactiveZones := getActiveAndInactiveZones(regions.Zones)
+			if len(inactiveZones) > 0 && currentRegion.Active {
+				fmt.Print(yellowColor + "\nWARNING: " + resetColor + "If you have any intention to migrate projects, do not try to create a new project in destination region!\n\n")
+			}
+		}
 	}
 
 	return paasCommand
@@ -303,4 +329,16 @@ func getArvanServerDomainPort() (string, error) {
 
 	result := hostnameEscaped + ":" + port
 	return result, nil
+}
+
+func getActiveAndInactiveZones(zones []config.Zone) ([]config.Zone, []config.Zone) {
+	var activeZones, inactiveZones []config.Zone
+	for i := 0; i < len(zones); i++ {
+		if zones[i].Active {
+			activeZones = append(activeZones, zones[i])
+		} else {
+			inactiveZones = append(inactiveZones, zones[i])
+		}
+	}
+	return activeZones, inactiveZones
 }
