@@ -25,24 +25,26 @@ type ConfigInfo struct {
 
 	// path to arvan config directroy e.g /home/jane/.arvan
 	homeDir string
+
+	region string
 }
 
-//GetServer returns base url to access arvan api server
+// GetServer returns base url to access arvan api server
 func (c *ConfigInfo) GetServer() string {
 	return c.server
 }
 
-//GetApiKey returns an api key used to authorize request to arvan api server
+// GetApiKey returns an api key used to authorize request to arvan api server
 func (c *ConfigInfo) GetApiKey() string {
 	return c.apiKey
 }
 
-//GetConfigFilePath returns path to arvan config file e.g /home/jane/.arvan/config
+// GetConfigFilePath returns path to arvan config file e.g /home/jane/.arvan/config
 func (c *ConfigInfo) GetConfigFilePath() string {
 	return c.configFilePath
 }
 
-//GetHomeDir returns path to arvan config directroy e.g /home/jane/.arvan
+// GetHomeDir returns path to arvan config directroy e.g /home/jane/.arvan
 func (c *ConfigInfo) GetHomeDir() string {
 	return c.homeDir
 }
@@ -94,6 +96,7 @@ func (c *ConfigInfo) SaveConfig() (bool, error) {
 		ApiVersion: configFileApiVersion,
 		Server:     c.server,
 		ApiKey:     c.apiKey,
+		Region:     c.region,
 	}
 
 	configFileStr, err := yaml.Marshal(&configFileStruct)

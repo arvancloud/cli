@@ -10,6 +10,10 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+const (
+	regionsEndpoint = "/paas/v1/regions/"
+)
+
 type configFile struct {
 	ApiVersion string `yaml:"apiVersion"`
 	Server     string `yaml:"server"`
@@ -44,13 +48,15 @@ func LoadConfigFile() (bool, error) {
 			return false, err
 		}
 
+		arvanConfig.apiKey = configFileStruct.ApiKey
+		arvanConfig.server = configFileStruct.Server
+
 		if configFileStruct.Region != "" {
+			arvanConfig.server = configFileStruct.Server + regionsEndpoint + configFileStruct.Region
 			_, err = arvanConfig.SaveConfig()
 			utl.CheckErr(err)
 		}
 
-		arvanConfig.apiKey = configFileStruct.ApiKey
-		arvanConfig.server = configFileStruct.Server
 		return true, nil
 	}
 
