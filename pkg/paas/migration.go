@@ -23,7 +23,15 @@ import (
 	"github.com/olekukonko/tablewriter"
 	"github.com/openshift/oc/pkg/helpers/term"
 	"github.com/spf13/cobra"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 	"k8s.io/client-go/rest"
+)
+
+var (
+	migrateLong = `
+    Migration of user's namespaces from one region to another
+	`
 )
 
 const (
@@ -97,7 +105,7 @@ func NewCmdMigrate(in io.Reader, out, errout io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "migrate",
 		Short: "Migrate namespaces to destination region",
-		Long:  loginLong,
+		Long:  migrateLong,
 		Run: func(c *cobra.Command, args []string) {
 			explainOut := term.NewResponsiveWriter(out)
 			c.SetOutput(explainOut)
@@ -173,6 +181,16 @@ func NewCmdMigrate(in io.Reader, out, errout io.Writer) *cobra.Command {
 // reMigrationConfirm makes sure that user enters yes/no correctly.
 func reMigrationConfirm(in io.Reader, writer io.Writer) bool {
 	inputExplain := "Do you want to run a new migration?[y/N]: "
+
+	defaultVal := "N"
+
+	value := utl.ReadInput(inputExplain, defaultVal, writer, in, confirmationValidate)
+	return value == "y"
+}
+
+// newProjectConfirm makes sure that user enters yes/no correctly.
+func newProjectConfirm(in io.Reader, writer io.Writer) bool {
+	inputExplain := "Do you want to continue?[y/N]: "
 
 	defaultVal := "N"
 
@@ -266,13 +284,13 @@ func sprintProjects(projects []string) string {
 
 // migrationConfirm gets confirmation of proceeding namespace migration by asking user to enter namespace's name.
 func migrationConfirm(project, region string, in io.Reader, writer io.Writer) bool {
-	explain := fmt.Sprintf("\nYou're about to migrate \"%s\" from region \"%s\" to \"%s\".\n", project, getCurrentRegion(), region)
+	explain := fmt.Sprintf("\nYou're about to migrate \"%s\" from region \"%s\" to \"%s\".\n\n"+yellowColor+"WARNING:\nThis will STOP applications during migration process. Your data would still be safe and available in source region. Migration is running in the background and may take a while. You can optionally detach(Ctrl+C) for now and continue monitoring the process after using 'arvan paas migrate'."+resetColor+"\n\n", project, getCurrentRegion(), region)
 
 	_, err := fmt.Fprint(writer, explain)
 	if err != nil {
 		return false
 	}
-	inputExplain := fmt.Sprintf(yellowColor+"\nWARNING:\nThis will STOP applications during migration process. Your data would still be safe and available in source region. Migration is running in the background and may take a while. You can optionally detach(Ctrl+C) for now and continue monitoring the process after using 'arvan paas migrate'."+resetColor+"\n\nPlease enter project's name [%s] to proceed: ", project)
+	inputExplain := fmt.Sprintf("Please enter project's name [%s] to proceed: ", project)
 
 	defaultVal := ""
 
@@ -362,7 +380,9 @@ func sprintResponse(response ProgressResponse, w io.Writer) error {
 			detail = s.Data.Detail
 		}
 
-		responseStr += fmt.Sprintf("\t%s   \t\t\t%s\t%s\n", s.Title, strings.Title(s.State), detail)
+		caser := cases.Title(language.English)
+
+		responseStr += fmt.Sprintf("\t%s   \t\t\t%s\t%s\n", s.Title, caser.String(s.State), detail)
 	}
 
 	fmt.Fprintf(w, "%s", responseStr)
@@ -456,6 +476,7 @@ func httpGet(endpoint string) (*ProgressResponse, error) {
 	var response ProgressResponse
 	err = json.Unmarshal(responseBody, &response)
 	if err != nil {
+		failureOutput("Migration is running in the background. You can continue monitoring the process using 'arvan paas migrate'.")
 		return nil, err
 	}
 
@@ -521,9 +542,7 @@ func successOutput(data StepData) {
 		}
 
 		nonFreeDomainTable.Render()
-	}
 
-	if len(freeSourceDomains) > 0 {
 		gatewayTable := tablewriter.NewWriter(os.Stdout)
 		gatewayTable.SetHeader([]string{"old gateway", "new gateway"})
 
@@ -543,19 +562,17 @@ func getZoneByName(name string) (*config.Zone, error) {
 		return nil, errors.New("invalid region info")
 	}
 
-	activeZones, _ := getActiveAndInactiveZones(regions.Zones)
+	upZones, _ := getUpAndDownZones(regions.Zones)
 
-	if len(activeZones) < 1 {
+	if len(upZones) < 1 {
 		return nil, errors.New("no active region available")
 	}
 
-	for i, zone := range activeZones {
+	for i, zone := range upZones {
 		if zone.Name == name {
-			return &activeZones[i], nil
+			return &upZones[i], nil
 		}
 	}
 
-	log.Printf("destination region not found")
-
-	return nil, nil
+	return nil, errors.New("destination region not found")
 }
