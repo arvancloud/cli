@@ -188,6 +188,16 @@ func reMigrationConfirm(in io.Reader, writer io.Writer) bool {
 	return value == "y"
 }
 
+// newProjectConfirm makes sure that user enters yes/no correctly.
+func newProjectConfirm(in io.Reader, writer io.Writer) bool {
+	inputExplain := "Do you want to continue?[y/N]: "
+
+	defaultVal := "N"
+
+	value := utl.ReadInput(inputExplain, defaultVal, writer, in, confirmationValidate)
+	return value == "y"
+}
+
 // confirmationValidate checks yes/no entry
 func confirmationValidate(input string) (bool, error) {
 	if input != "y" && input != "N" {

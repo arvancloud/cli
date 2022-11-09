@@ -67,12 +67,12 @@ func NewCmdPaas() *cobra.Command {
 			regions, err := api.GetZones()
 			if err != nil {
 				failureOutput("failed to get zones")
-				return
+				utl.CheckErr(errors.New("failed to get zones"))
 			}
 
 			if len(regions.Zones) < 1 {
 				failureOutput("invalid region info")
-				return
+				utl.CheckErr(errors.New("invalid region info"))
 			}
 
 			currentRegionAbbr := getCurrentRegion()
@@ -85,6 +85,10 @@ func NewCmdPaas() *cobra.Command {
 			_, inactiveZones := getActiveAndInactiveZones(regions.Zones)
 			if len(inactiveZones) > 0 && currentRegion.Active {
 				fmt.Print(yellowColor + "\nWARNING: " + resetColor + "If you have any intention to migrate projects, do not try to create a new project in destination region!\n\n")
+
+				if !newProjectConfirm(in, out) {
+					utl.CheckErr(errors.New(""))
+				}
 			}
 		}
 	}
@@ -121,6 +125,33 @@ func prepareConfig(cmd *cobra.Command) error {
 	}
 	if len(projects) == 0 && cmd.Name() != "new-project" {
 		return errors.New("no project found. \n To get started create new project using \"arvan paas new-project NAME\".")
+	}
+
+	kubeConfigPath := paasConfigPath()
+	err = syncKubeConfig(kubeConfigPath, username, projects)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func prepareConfigSwtichRegion(cmd *cobra.Command) error {
+	// #TODO do not use InsecureSkipVerify
+	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	username, httpStatusCode, err := whoAmI()
+	if err != nil {
+		if httpStatusCode == 401 {
+			return fmt.Errorf("%v\n%s", err, `Try "arvan login".`)
+		}
+		if httpStatusCode >= 500 {
+			return fmt.Errorf("%v\n%s", err, `Please try again later`)
+		}
+		return err
+	}
+
+	projects, err := projectList()
+	if err != nil {
+		return err
 	}
 
 	kubeConfigPath := paasConfigPath()

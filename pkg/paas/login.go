@@ -97,7 +97,7 @@ func NewCmdSwitchRegion(in io.Reader, out, errout io.Writer) *cobra.Command {
 			_, err = arvanConfig.SaveConfig()
 			utl.CheckErr(err)
 
-			err = prepareConfig(c)
+			err = prepareConfigSwtichRegion(c)
 			utl.CheckErr(err)
 
 			fmt.Fprintf(explainOut, "Region Switched successfully.\n")
