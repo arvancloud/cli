@@ -5,13 +5,20 @@ import (
 	"io/ioutil"
 	"sync"
 
+	"github.com/arvancloud/cli/pkg/utl"
+
 	"gopkg.in/yaml.v2"
+)
+
+const (
+	regionsEndpoint = "/paas/v1/regions/"
 )
 
 type configFile struct {
 	ApiVersion string `yaml:"apiVersion"`
 	Server     string `yaml:"server"`
 	ApiKey     string `yaml:"apikey"`
+	Region     string `yaml:"region"`
 }
 
 var instance *ConfigInfo
@@ -40,8 +47,16 @@ func LoadConfigFile() (bool, error) {
 		if err != nil {
 			return false, err
 		}
+
 		arvanConfig.apiKey = configFileStruct.ApiKey
 		arvanConfig.server = configFileStruct.Server
+
+		if configFileStruct.Region != "" {
+			arvanConfig.server = configFileStruct.Server + regionsEndpoint + configFileStruct.Region
+			_, err = arvanConfig.SaveConfig()
+			utl.CheckErr(err)
+		}
+
 		return true, nil
 	}
 

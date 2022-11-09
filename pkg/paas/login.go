@@ -97,7 +97,7 @@ func NewCmdSwitchRegion(in io.Reader, out, errout io.Writer) *cobra.Command {
 			_, err = arvanConfig.SaveConfig()
 			utl.CheckErr(err)
 
-			err = prepareConfig(c)
+			err = prepareConfigSwtichRegion(c)
 			utl.CheckErr(err)
 
 			fmt.Fprintf(explainOut, "Region Switched successfully.\n")
@@ -145,14 +145,14 @@ func getSelectedRegion(in io.Reader, writer io.Writer) (*config.Zone, error) {
 		return nil, errors.New("invalid region info")
 	}
 
-	activeZones, inactiveZones := getActiveAndInactiveZones(regions.Zones)
+	upZones, downZones := getUpAndDownZones(regions.Zones)
 
-	if len(activeZones) < 1 {
+	if len(upZones) < 1 {
 		return nil, errors.New("no active region available")
 	}
 
 	explain := "Select arvan region:\n"
-	explain += sprintRegions(activeZones, inactiveZones)
+	explain += sprintRegions(upZones, downZones)
 
 	_, err = fmt.Fprint(writer, explain)
 	if err != nil {
@@ -162,17 +162,17 @@ func getSelectedRegion(in io.Reader, writer io.Writer) (*config.Zone, error) {
 
 	defaultVal := "1"
 
-	if len(activeZones) == 1 {
+	if len(upZones) == 1 {
 		fmt.Fprintf(writer, inputExplain+"1\n")
-		return &activeZones[0], nil
+		return &upZones[0], nil
 	}
 
-	validator := regionValidator{len(activeZones)}
+	validator := regionValidator{len(upZones)}
 
 	regionIndex := utl.ReadInput(inputExplain, defaultVal, writer, in, validator.validate)
 	intIndex, _ := strconv.Atoi(regionIndex)
 
-	return &activeZones[intIndex-1], nil
+	return &upZones[intIndex-1], nil
 }
 
 type regionValidator struct {
@@ -218,7 +218,7 @@ func sprintRegions(activeZones, inactiveRegions []config.Zone) string {
 	return result
 }
 
-func getActiveAndInactiveZones(zones []config.Zone) ([]config.Zone, []config.Zone) {
+func getUpAndDownZones(zones []config.Zone) ([]config.Zone, []config.Zone) {
 	var activeZones, inactiveZones []config.Zone
 	for i := 0; i < len(zones); i++ {
 		if zones[i].Status == "UP" {
