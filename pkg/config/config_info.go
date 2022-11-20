@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"os/user"
+	"strings"
 
 	"gopkg.in/yaml.v2"
 )
@@ -31,7 +32,7 @@ type ConfigInfo struct {
 
 // GetServer returns base url to access arvan api server
 func (c *ConfigInfo) GetServer() string {
-	return c.server
+	return strings.Replace(c.server, "arvancloud.com", "arvancloud.ir", -1)
 }
 
 // GetApiKey returns an api key used to authorize request to arvan api server

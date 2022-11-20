@@ -18,7 +18,7 @@ const (
 	regionsEndpoint = "/paas/v1/zones"
 	userEndpoint    = "/g/user"
 	updateEndpoint  = "/update"
-	updateServer    = "https://cli.arvan.run"
+	updateServer    = "https://cli.arvanpaas.ir"
 )
 
 // GetUserInfo returns a dictionary of user info if authentication credentials is valid.
