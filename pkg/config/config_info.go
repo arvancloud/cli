@@ -134,5 +134,5 @@ func defaultConfigFilePath(homeDir string) string {
 }
 
 func serverAddress() string {
-	return "https://napi.arvancloud.com"
+	return "https://napi.arvancloud.ir"
 }
