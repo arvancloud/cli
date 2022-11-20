@@ -322,6 +322,7 @@ func getArvanAuthorization() string {
 func getArvanPaasServerBase() string {
 	arvanConfig := config.GetConfigInfo()
 	arvanServer := arvanConfig.GetServer()
+	arvanServer = strings.Replace(arvanServer, "arvancloud.com", "arvancloud.ir", 1)
 	return arvanServer + paasUrlPostfix
 }
 
