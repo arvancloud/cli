@@ -164,15 +164,12 @@ func prepareConfigSwtichRegion(cmd *cobra.Command) error {
 }
 
 func prepareCommand(cmd *cobra.Command) error {
-	err := UpgradeConfigFile()
-	if err != nil {
-		return err
-	}
+	_ = UpgradeConfigFile()
 
 	arvanConfig := config.GetConfigInfo()
 	kubeConfigPath := paasConfigPath()
 
-	err = setConfigFlag(cmd, kubeConfigPath)
+	err := setConfigFlag(cmd, kubeConfigPath)
 	if err != nil {
 		return err
 	}
@@ -194,12 +191,12 @@ func UpgradeConfigFile() error {
 	if err != nil {
 		return err
 	}
-	if strings.Contains(configFileStruct.Clusters[0].Cluster.Server, "arvancloud.com") {
-		configFileStruct.Clusters[0].Cluster.Server = strings.Replace(configFileStruct.Clusters[0].Cluster.Server, "arvancloud.com", "arvancloud.ir", -1)
-	}
+	
+	configFileStruct.Clusters[0].Cluster.Server = strings.Replace(configFileStruct.Clusters[0].Cluster.Server, "arvancloud.com", "arvancloud.ir", -1)
+
 	err = writeKubeConfig(configFileStruct, path)
 	if err != nil {
-		return err
+		return err	
 	}
 
 	return nil
@@ -261,7 +258,7 @@ func whoAmI() (string, int, error) {
 			return "", httpResp.StatusCode, err
 		}
 		if kind != "User" {
-			return "", httpResp.StatusCode, errors.New("User kind not supported")
+			return "", httpResp.StatusCode, errors.New("user kind not supported")
 		}
 		var metadata map[string]*json.RawMessage
 		err = json.Unmarshal(*objmap["metadata"], &metadata)
@@ -278,7 +275,7 @@ func whoAmI() (string, int, error) {
 		}
 	}
 
-	return "", httpResp.StatusCode, errors.New("invalid authentication credentials.")
+	return "", httpResp.StatusCode, errors.New("invalid authentication credentials")
 }
 
 func projectList() ([]string, error) {
@@ -321,15 +318,15 @@ func projectList() ([]string, error) {
 			for i := 0; i < len(projects); i++ {
 				err = json.Unmarshal(*projects[i], &project)
 				if err != nil || project["metadata"] == nil {
-					return nil, errors.New("Invalid projects response")
+					return nil, errors.New("invalid projects response")
 				}
 				err = json.Unmarshal(*project["metadata"], &projectMetadata)
 				if err != nil || projectMetadata["name"] == nil {
-					return nil, errors.New("Invalid projects response")
+					return nil, errors.New("invalid projects response")
 				}
 				err = json.Unmarshal(*projectMetadata["name"], &projectName)
 				if err != nil || projectMetadata["name"] == nil {
-					return nil, errors.New("Invalid projects response")
+					return nil, errors.New("invalid projects response")
 				}
 				result = append(result, projectName)
 			}
@@ -338,7 +335,7 @@ func projectList() ([]string, error) {
 			return nil, nil
 		}
 	}
-	return nil, errors.New("Invalid projects response")
+	return nil, errors.New("invalid projects response")
 }
 
 func getArvanAuthorization() string {

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"regexp"
 	"strconv"
 
@@ -43,10 +42,8 @@ func NewCmdLogin(in io.Reader, out, errout io.Writer) *cobra.Command {
 			utl.CheckErr(err)
 			apiKey := getApiKey(in, explainOut)
 
-			_, err = config.LoadConfigFile()
-			if err != nil {
-				log.Println(err)
-			}
+			_, _ = config.LoadConfigFile()
+
 			arvanConfig := config.GetConfigInfo()
 
 			arvanConfig.Initiate(apiKey, *region)
@@ -84,10 +81,8 @@ func NewCmdSwitchRegion(in io.Reader, out, errout io.Writer) *cobra.Command {
 			region, err := getSelectedRegion(in, explainOut)
 			utl.CheckErr(err)
 
-			_, err = config.LoadConfigFile()
-			if err != nil {
-				log.Println(err)
-			}
+			_, _ = config.LoadConfigFile()
+
 			arvanConfig := config.GetConfigInfo()
 
 			arvanConfig.Initiate(arvanConfig.GetApiKey(), *region)
