@@ -14,6 +14,7 @@ import (
 
 	"github.com/arvancloud/cli/pkg/api"
 	"github.com/openshift/oc/pkg/version"
+	"gopkg.in/yaml.v2"
 	"k8s.io/client-go/rest"
 
 	"github.com/arvancloud/cli/pkg/oc"
@@ -163,9 +164,15 @@ func prepareConfigSwtichRegion(cmd *cobra.Command) error {
 }
 
 func prepareCommand(cmd *cobra.Command) error {
+	err := UpgradeConfigFile()
+	if err != nil {
+		return err
+	}
+
 	arvanConfig := config.GetConfigInfo()
 	kubeConfigPath := paasConfigPath()
-	err := setConfigFlag(cmd, kubeConfigPath)
+
+	err = setConfigFlag(cmd, kubeConfigPath)
 	if err != nil {
 		return err
 	}
@@ -174,6 +181,28 @@ func prepareCommand(cmd *cobra.Command) error {
 	}
 
 	return setArvanBuilder(cmd)
+}
+
+func UpgradeConfigFile() error {
+	path := paasConfigPath()
+	data, err := ioutil.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	configFileStruct := KubeConfig{}
+	err = yaml.Unmarshal(data, &configFileStruct)
+	if err != nil {
+		return err
+	}
+	if strings.Contains(configFileStruct.Clusters[0].Cluster.Server, "arvancloud.com") {
+		configFileStruct.Clusters[0].Cluster.Server = strings.Replace(configFileStruct.Clusters[0].Cluster.Server, "arvancloud.com", "arvancloud.ir", -1)
+	}
+	err = writeKubeConfig(configFileStruct, path)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func paasConfigPath() string {
