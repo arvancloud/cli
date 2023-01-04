@@ -46,6 +46,8 @@ func NewCmdLogin(in io.Reader, out, errout io.Writer) *cobra.Command {
 
 			arvanConfig := config.GetConfigInfo()
 
+			tempApiKey := arvanConfig.GetApiKey()
+
 			arvanConfig.Initiate(apiKey, *region)
 
 			utl.CheckErr(arvanConfig.Complete())
@@ -53,8 +55,13 @@ func NewCmdLogin(in io.Reader, out, errout io.Writer) *cobra.Command {
 			_, err = arvanConfig.SaveConfig()
 			utl.CheckErr(err)
 
-			_, err = isAuthorized(apiKey)
-			utl.CheckErr(err)
+			isAuthorized, authErr := isAuthorized(apiKey)
+			if !isAuthorized {
+				arvanConfig.Initiate(tempApiKey, *region)
+				_, err = arvanConfig.SaveConfig()
+				utl.CheckErr(err)
+			}
+			utl.CheckErr(authErr)
 
 			if c != nil {
 				err = prepareConfig(c)
