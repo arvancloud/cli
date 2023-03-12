@@ -46,6 +46,12 @@ func NewCmdPaas() *cobra.Command {
 	paasCommand.PersistentPreRun = func(cmd *cobra.Command, args []string) {
 		err := prepareCommand(cmd)
 		utl.CheckErr(err)
+
+		if cmd != nil {
+			err = prepareConfig(cmd)
+			utl.CheckErr(err)
+		}
+
 		update, err := api.CheckUpdate()
 		if err != nil {
 			return
@@ -191,12 +197,12 @@ func UpgradeConfigFile() error {
 	if err != nil {
 		return err
 	}
-	
+
 	configFileStruct.Clusters[0].Cluster.Server = strings.Replace(configFileStruct.Clusters[0].Cluster.Server, "arvancloud.com", "arvancloud.ir", -1)
 
 	err = writeKubeConfig(configFileStruct, path)
 	if err != nil {
-		return err	
+		return err
 	}
 
 	return nil
