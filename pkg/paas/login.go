@@ -130,7 +130,7 @@ func getApiKey(in io.Reader, writer io.Writer) string {
 }
 
 func apiKeyValidator(input string) (bool, error) {
-	var validApiKey = regexp.MustCompile(`^Apikey [a-z0-9\-]+$$`)
+	var validApiKey = regexp.MustCompile(`^(A|a)pikey [a-z0-9\-]+$$`)
 	if !validApiKey.MatchString(input) {
 		return false, errors.New("API token should be in format: 'Apikey xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'")
 	}
